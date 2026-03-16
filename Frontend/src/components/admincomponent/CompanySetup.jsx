@@ -86,22 +86,22 @@ const CompanySetup = () => {
   }, [singleCompany]);
 
   return (
-    <div>
+    <div className="qh-page">
       <Navbar />
-      <div className="max-w-xl mx-auto my-10">
-        <form onSubmit={submitHandler}>
-          <div className="flex items-center gap-5 p-8">
+      <div className="qh-shell py-8">
+        <form onSubmit={submitHandler} className="qh-panel max-w-3xl mx-auto">
+          <div className="flex items-center gap-5 pb-4">
             <Button
               onClick={() => navigate("/admin/companies")}
               variant="outline"
-              className="flex items-center gap-2 text-gray-500 font-semibold"
+              className="flex items-center gap-2 text-slate-600 font-semibold"
             >
               <ArrowLeft />
               <span>Back</span>
             </Button>
-            <h1 className="font-bold text-xl">Company Setup</h1>
+            <h1 className="qh-title text-xl">Company Setup</h1>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Company Name</Label>
               <Input

@@ -58,7 +58,7 @@ const PostJob = () => {
         },
         withCredentials: true,
       });
-      if (res.data.success) {
+      if (res.data.success || res.data.status) {
         toast.success(res.data.message);
         navigate("/admin/jobs");
       } else {
@@ -78,14 +78,14 @@ const PostJob = () => {
   };
 
   return (
-    <div>
+    <div className="qh-page">
       <Navbar />
-      <div className="flex items-center justify-center w-screen my-5">
+      <div className="qh-shell flex items-center justify-center py-8">
         <form
           onSubmit={submitHandler}
-          className="p-8 max-w-4xl border border-gray-500 shadow-sm hover:shadow-xl hover:shadow-red-300 rounded-lg"
+          className="p-8 max-w-5xl w-full qh-panel"
         >
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <Label>Title</Label>
               <Input
@@ -178,7 +178,7 @@ const PostJob = () => {
             <div>
               {companies.length > 0 && (
                 <Select onValueChange={selectChangeHandler}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full md:w-[260px]">
                     <SelectValue placeholder="Select a Company" />
                   </SelectTrigger>
                   <SelectContent>

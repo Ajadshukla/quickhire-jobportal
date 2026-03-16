@@ -16,9 +16,9 @@ const Job1 = ({ job }) => {
   };
 
   return (
-    <div className="p-5 rounded-md shadow-xl bg-white border border-gray-100">
+    <div className="qh-panel p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_30px_rgba(15,23,42,0.12)]">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-slate-500">
           {daysAgoFunction(job?.createdAt) === 0
             ? "Today"
             : `${daysAgoFunction(job?.createdAt)} days ago`}
@@ -35,23 +35,23 @@ const Job1 = ({ job }) => {
           </Avatar>
         </Button>
         <div>
-          <h1 className="font-medium text-lg">{job?.company?.name}</h1>
-          <p className="text-sm text-gray-500">India</p>
+          <h1 className="qh-display font-medium text-lg text-slate-900">{job?.company?.name}</h1>
+          <p className="text-sm text-slate-500">India</p>
         </div>
       </div>
 
       <div>
-        <h1 className="font-bold text-lg my-2">{job?.title}</h1>
-        <p className="text-sm text-gray-600">{job?.description}</p>
+        <h1 className="qh-display font-bold text-lg my-2 text-slate-900">{job?.title}</h1>
+        <p className="text-sm text-slate-600 line-clamp-3">{job?.description}</p>
       </div>
       <div className="flex items-center gap-2 mt-4">
-        <Badge className={"text-blue-700 font-bold"} variant="ghost">
+        <Badge className={"bg-blue-50 text-blue-700 border border-blue-100 font-semibold"}>
           {job?.position} Positions
         </Badge>
-        <Badge className={"text-[#F83002] font-bold"} variant="ghost">
+        <Badge className={"bg-rose-50 text-rose-700 border border-rose-100 font-semibold"}>
           {job?.jobType}
         </Badge>
-        <Badge className={"text-[#7209b7] font-bold"} variant="ghost">
+        <Badge className={"bg-amber-50 text-amber-700 border border-amber-100 font-semibold qh-code"}>
           {job?.salary}LPA
         </Badge>
       </div>
@@ -62,7 +62,7 @@ const Job1 = ({ job }) => {
         >
           Details
         </Button>
-        <Button className="bg-[#7209b7]">Save For Later</Button>
+        <Button className="bg-slate-900 hover:bg-slate-800">Save</Button>
       </div>
     </div>
   );

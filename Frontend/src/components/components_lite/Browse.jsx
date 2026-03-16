@@ -15,17 +15,23 @@ const Browse = () => {
     };
   }, []);
   return (
-    <div>
+    <div className="qh-page">
       <Navbar />
-      <div className="max-w-7xl mx-auto my-10">
-        <h1 className="font-bold text-xl my-10 ">
+      <div className="qh-shell my-10">
+        <h1 className="qh-title my-6">
           Search Results {allJobs.length}
         </h1>
-        <div className="grid grid-cols-3 gap-4  ">
-          {allJobs.map((job) => {
-            return <Job1 key={job._id} job={job} />;
-          })}
-        </div>
+        {allJobs.length === 0 ? (
+          <p className="qh-panel text-slate-600">
+            No jobs available yet. Recruiters can add jobs from Admin / Jobs / Create.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {allJobs.map((job) => {
+              return <Job1 key={job._id} job={job} />;
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

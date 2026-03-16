@@ -20,12 +20,13 @@ const Companies = () => {
     dispatch(setSearchCompanyByText(input));
   }, [input]);
   return (
-    <div>
+    <div className="qh-page">
       <Navbar />
-      <div className=" max-w-6xl mx-auto my-10">
-        <div className="flex items-center justify-between my-5">
+      <div className="qh-shell my-8">
+        <div className="qh-panel">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 my-2">
           <Input
-            className="w-fit"
+            className="w-full md:w-80"
             placeholder="Filter by Name"
             onChange={(e) => setInput(e.target.value)}
           ></Input>
@@ -35,6 +36,7 @@ const Companies = () => {
         </div>
         <div>
           <CompaniesTable />
+        </div>
         </div>
       </div>
     </div>

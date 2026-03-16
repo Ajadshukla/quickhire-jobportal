@@ -1,0 +1,90 @@
+[
+  {
+    "_id": { "$oid": "66f200000000000000000001" },
+    "name": "Google",
+    "description": "Search, cloud and productivity products.",
+    "website": "https://about.google/",
+    "location": "Bengaluru",
+    "logo": "https://logo.clearbit.com/google.com",
+    "userId": { "$oid": "66f100000000000000000001" },
+    "createdAt": { "$date": "2026-03-02T09:00:00.000Z" },
+    "updatedAt": { "$date": "2026-03-02T09:00:00.000Z" }
+  },
+  {
+    "_id": { "$oid": "66f200000000000000000002" },
+    "name": "Microsoft",
+    "description": "Cloud platforms, productivity software and AI.",
+    "website": "https://www.microsoft.com/",
+    "location": "Hyderabad",
+    "logo": "https://logo.clearbit.com/microsoft.com",
+    "userId": { "$oid": "66f100000000000000000001" },
+    "createdAt": { "$date": "2026-03-02T09:05:00.000Z" },
+    "updatedAt": { "$date": "2026-03-02T09:05:00.000Z" }
+  },
+  {
+    "_id": { "$oid": "66f200000000000000000003" },
+    "name": "Amazon",
+    "description": "E-commerce, cloud services and logistics tech.",
+    "website": "https://www.amazon.com/",
+    "location": "Bengaluru",
+    "logo": "https://logo.clearbit.com/amazon.com",
+    "userId": { "$oid": "66f100000000000000000002" },
+    "createdAt": { "$date": "2026-03-02T09:10:00.000Z" },
+    "updatedAt": { "$date": "2026-03-02T09:10:00.000Z" }
+  },
+  {
+    "_id": { "$oid": "66f200000000000000000004" },
+    "name": "Adobe",
+    "description": "Creative, document and marketing software products.",
+    "website": "https://www.adobe.com/",
+    "location": "Noida",
+    "logo": "https://logo.clearbit.com/adobe.com",
+    "userId": { "$oid": "66f100000000000000000002" },
+    "createdAt": { "$date": "2026-03-02T09:15:00.000Z" },
+    "updatedAt": { "$date": "2026-03-02T09:15:00.000Z" }
+  },
+  {
+    "_id": { "$oid": "66f200000000000000000005" },
+    "name": "Netflix",
+    "description": "Streaming platform and personalization technology.",
+    "website": "https://www.netflix.com/",
+    "location": "Remote",
+    "logo": "https://logo.clearbit.com/netflix.com",
+    "userId": { "$oid": "66f100000000000000000003" },
+    "createdAt": { "$date": "2026-03-02T09:20:00.000Z" },
+    "updatedAt": { "$date": "2026-03-02T09:20:00.000Z" }
+  },
+  {
+    "_id": { "$oid": "66f200000000000000000006" },
+    "name": "Uber",
+    "description": "Mobility, maps and real-time systems engineering.",
+    "website": "https://www.uber.com/",
+    "location": "Bengaluru",
+    "logo": "https://logo.clearbit.com/uber.com",
+    "userId": { "$oid": "66f100000000000000000003" },
+    "createdAt": { "$date": "2026-03-02T09:25:00.000Z" },
+    "updatedAt": { "$date": "2026-03-02T09:25:00.000Z" }
+  },
+  {
+    "_id": { "$oid": "66f200000000000000000007" },
+    "name": "Paytm",
+    "description": "Payments, fintech and commerce platforms.",
+    "website": "https://paytm.com/",
+    "location": "Noida",
+    "logo": "https://logo.clearbit.com/paytm.com",
+    "userId": { "$oid": "66f100000000000000000004" },
+    "createdAt": { "$date": "2026-03-02T09:30:00.000Z" },
+    "updatedAt": { "$date": "2026-03-02T09:30:00.000Z" }
+  },
+  {
+    "_id": { "$oid": "66f200000000000000000008" },
+    "name": "Infosys",
+    "description": "Consulting, engineering and enterprise solutions.",
+    "website": "https://www.infosys.com/",
+    "location": "Pune",
+    "logo": "https://logo.clearbit.com/infosys.com",
+    "userId": { "$oid": "66f100000000000000000004" },
+    "createdAt": { "$date": "2026-03-02T09:35:00.000Z" },
+    "updatedAt": { "$date": "2026-03-02T09:35:00.000Z" }
+  }
+]

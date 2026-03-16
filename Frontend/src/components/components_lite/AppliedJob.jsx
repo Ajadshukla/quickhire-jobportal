@@ -16,7 +16,7 @@ const AppliedJob = () => {
   return (
     <div>
       <Table>
-        <TableCaption>Recent Applied Jobs</TableCaption>
+        <TableCaption className="text-slate-500">Recent applied jobs</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead>Date</TableHead>
@@ -27,7 +27,9 @@ const AppliedJob = () => {
         </TableHeader>
         <TableBody>
           {allAppliedJobs.length <= 0 ? (
-            <span>You have not applied any job yet. </span>
+            <TableRow>
+              <TableCell colSpan={4} className="text-center text-slate-500">You have not applied for any job yet.</TableCell>
+            </TableRow>
           ) : (
             allAppliedJobs.map((appliedJob) => (
               <TableRow key={appliedJob._id}>
@@ -38,15 +40,14 @@ const AppliedJob = () => {
                   <Badge
                     className={`${
                       appliedJob?.status === "rejected"
-                        ? "bg-red-500"
+                        ? "bg-red-500 text-white"
                         : appliedJob?.status === "accepted"
-                        ? "bg-green-600"
-                        : "bg-gray-500"
+                        ? "bg-green-600 text-white"
+                        : "bg-gray-500 text-white"
                     }`}
                   >
-                    {" "}
                     {appliedJob?.status}
-                  </Badge>{" "}
+                  </Badge>
                 </TableCell>
               </TableRow>
             ))

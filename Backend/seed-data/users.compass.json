@@ -1,0 +1,98 @@
+[
+  {
+    "_id": { "$oid": "66f100000000000000000001" },
+    "fullname": "Riya Sharma",
+    "email": "riya.recruiter@jobportal.demo",
+    "phoneNumber": "9000000001",
+    "password": "$2a$10$R/9W9Mu8Om4400Hio62jtuX8J3CncOnHjAr/iZ31Ch0o//.F.o8S6",
+    "role": "Recruiter",
+    "authProvider": "local",
+    "profile": {
+      "bio": "Talent acquisition lead for product engineering roles.",
+      "skills": ["Hiring", "ATS", "Interviewing"],
+      "profilePhoto": "https://i.pravatar.cc/300?img=32"
+    },
+    "createdAt": { "$date": "2026-03-01T10:00:00.000Z" },
+    "updatedAt": { "$date": "2026-03-01T10:00:00.000Z" }
+  },
+  {
+    "_id": { "$oid": "66f100000000000000000002" },
+    "fullname": "Aman Verma",
+    "email": "aman.recruiter@jobportal.demo",
+    "phoneNumber": "9000000002",
+    "password": "$2a$10$R/9W9Mu8Om4400Hio62jtuX8J3CncOnHjAr/iZ31Ch0o//.F.o8S6",
+    "role": "Recruiter",
+    "authProvider": "local",
+    "profile": {
+      "bio": "Recruiting software engineers and data professionals.",
+      "skills": ["Sourcing", "Negotiation", "Employer Branding"],
+      "profilePhoto": "https://i.pravatar.cc/300?img=12"
+    },
+    "createdAt": { "$date": "2026-03-01T10:05:00.000Z" },
+    "updatedAt": { "$date": "2026-03-01T10:05:00.000Z" }
+  },
+  {
+    "_id": { "$oid": "66f100000000000000000003" },
+    "fullname": "Neha Singh",
+    "email": "neha.recruiter@jobportal.demo",
+    "phoneNumber": "9000000003",
+    "password": "$2a$10$R/9W9Mu8Om4400Hio62jtuX8J3CncOnHjAr/iZ31Ch0o//.F.o8S6",
+    "role": "Recruiter",
+    "authProvider": "local",
+    "profile": {
+      "bio": "Hiring for cloud, DevOps, and backend teams.",
+      "skills": ["Technical Hiring", "Stakeholder Management"],
+      "profilePhoto": "https://i.pravatar.cc/300?img=47"
+    },
+    "createdAt": { "$date": "2026-03-01T10:10:00.000Z" },
+    "updatedAt": { "$date": "2026-03-01T10:10:00.000Z" }
+  },
+  {
+    "_id": { "$oid": "66f100000000000000000004" },
+    "fullname": "Karan Patel",
+    "email": "karan.recruiter@jobportal.demo",
+    "phoneNumber": "9000000004",
+    "password": "$2a$10$R/9W9Mu8Om4400Hio62jtuX8J3CncOnHjAr/iZ31Ch0o//.F.o8S6",
+    "role": "Recruiter",
+    "authProvider": "local",
+    "profile": {
+      "bio": "Campus and lateral hiring for product companies.",
+      "skills": ["Screening", "Offer Management"],
+      "profilePhoto": "https://i.pravatar.cc/300?img=20"
+    },
+    "createdAt": { "$date": "2026-03-01T10:15:00.000Z" },
+    "updatedAt": { "$date": "2026-03-01T10:15:00.000Z" }
+  },
+  {
+    "_id": { "$oid": "66f100000000000000000101" },
+    "fullname": "Ajad Student",
+    "email": "student1@jobportal.demo",
+    "phoneNumber": "9000000101",
+    "password": "$2a$10$aDZ/a6PWgsPm2wB6lbUWvOzfL6mQP0meK5V76gIXTwPiHgH4fO2R2",
+    "role": "Student",
+    "authProvider": "local",
+    "profile": {
+      "bio": "Fresher exploring frontend and backend roles.",
+      "skills": ["React", "Node.js", "MongoDB"],
+      "profilePhoto": "https://i.pravatar.cc/300?img=5"
+    },
+    "createdAt": { "$date": "2026-03-01T10:20:00.000Z" },
+    "updatedAt": { "$date": "2026-03-01T10:20:00.000Z" }
+  },
+  {
+    "_id": { "$oid": "66f100000000000000000102" },
+    "fullname": "Priya Student",
+    "email": "student2@jobportal.demo",
+    "phoneNumber": "9000000102",
+    "password": "$2a$10$aDZ/a6PWgsPm2wB6lbUWvOzfL6mQP0meK5V76gIXTwPiHgH4fO2R2",
+    "role": "Student",
+    "authProvider": "local",
+    "profile": {
+      "bio": "Interested in data and ML internships.",
+      "skills": ["Python", "SQL", "Pandas"],
+      "profilePhoto": "https://i.pravatar.cc/300?img=44"
+    },
+    "createdAt": { "$date": "2026-03-01T10:25:00.000Z" },
+    "updatedAt": { "$date": "2026-03-01T10:25:00.000Z" }
+  }
+]

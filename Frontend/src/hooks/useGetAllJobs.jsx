@@ -37,7 +37,7 @@ const useGetAllJobs = () => {
     };
 
     fetchAllJobs();
-  }, [dispatch]);
+  }, [dispatch, searchedQuery]);
 
   return { loading, error };
 };

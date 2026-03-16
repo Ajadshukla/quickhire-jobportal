@@ -83,7 +83,7 @@ const EditProfileModal = ({ open, setOpen }) => {
     <div>
       <Dialog open={open}>
         <DialogContent
-          className="sm:max-w-[500px]"
+          className="sm:max-w-[500px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
           onInteractOutside={() => setOpen(false)}
         >
           <DialogHeader>
@@ -100,9 +100,9 @@ const EditProfileModal = ({ open, setOpen }) => {
                   type="text"
                   id="name"
                   value={input.fullname}
-                  name="name"
+                  name="fullname"
                   onChange={changeEventHandler}
-                  className="col-span-3 border border-gray-300 rounded-md p-2"
+                  className="col-span-3 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md p-2"
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -115,7 +115,7 @@ const EditProfileModal = ({ open, setOpen }) => {
                   value={input.email}
                   name="email"
                   onChange={changeEventHandler}
-                  className="col-span-3 border border-gray-300 rounded-md p-2"
+                  className="col-span-3 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md p-2"
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -128,7 +128,7 @@ const EditProfileModal = ({ open, setOpen }) => {
                   value={input.phoneNumber} // Ensure this is correctly set
                   name="phoneNumber" // Ensure this matches the expected key
                   onChange={changeEventHandler}
-                  className="col-span-3 border border-gray-300 rounded-md p-2"
+                  className="col-span-3 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md p-2"
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -141,7 +141,7 @@ const EditProfileModal = ({ open, setOpen }) => {
                   value={input.bio}
                   name="bio"
                   onChange={changeEventHandler}
-                  className="col-span-3 border border-gray-300 rounded-md p-2"
+                  className="col-span-3 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md p-2"
                 />
               </div>
               {/* skills */}
@@ -154,22 +154,27 @@ const EditProfileModal = ({ open, setOpen }) => {
                   name="skills"
                   value={input.skills}
                   onChange={changeEventHandler}
-                  className="col-span-3 border border-gray-300 rounded-md p-2"
+                  className="col-span-3 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md p-2"
                 />
               </div>
               {/* Resume file upload */}
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="file" className="text-right">
-                  Resume
+                  File
                 </Label>
-                <input
-                  type="file"
-                  id="file"
-                  name="file"
-                  accept="application/pdf"
-                  onChange={FileChangehandler}
-                  className="col-span-3 border border-gray-300 rounded-md p-2"
-                />
+                <div className="col-span-3">
+                  <input
+                    type="file"
+                    id="file"
+                    name="file"
+                    accept="application/pdf,image/*"
+                    onChange={FileChangehandler}
+                    className="w-full border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md p-2"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                    Upload image to update profile photo, or upload PDF to update resume.
+                  </p>
+                </div>
               </div>
             </div>
 

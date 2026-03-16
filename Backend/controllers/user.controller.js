@@ -1,21 +1,515 @@
 import { User } from "../models/user.model.js";
+import { Job } from "../models/job.model.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import * as pdfParseModule from "pdf-parse";
 import getDataUri from "../utils/datauri.js";
 import cloudinary from "../utils/cloud.js";
+
+const PDFParse = pdfParseModule.PDFParse;
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const isProduction = process.env.NODE_ENV === "production";
+
+const authCookieOptions = {
+  maxAge: 24 * 60 * 60 * 1000,
+  httpOnly: true,
+  sameSite: isProduction ? "none" : "lax",
+  secure: isProduction,
+};
+
+const clearAuthCookieOptions = {
+  expires: new Date(0),
+  httpOnly: true,
+  sameSite: isProduction ? "none" : "lax",
+  secure: isProduction,
+};
+
+const isCloudinaryConfigured = () => {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUD_NAME;
+  const cloudApi = process.env.CLOUDINARY_API_KEY || process.env.CLOUD_API;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET || process.env.API_SECRET;
+
+  if (!cloudName || !cloudApi || !apiSecret) return false;
+  if (
+    cloudName.toLowerCase().includes("replace") ||
+    cloudApi.toLowerCase().includes("replace") ||
+    apiSecret.toLowerCase().includes("replace")
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+const STOP_WORDS = new Set([
+  "the",
+  "and",
+  "with",
+  "for",
+  "from",
+  "that",
+  "this",
+  "into",
+  "your",
+  "will",
+  "have",
+  "using",
+  "build",
+  "work",
+  "role",
+  "team",
+  "years",
+  "year",
+  "experience",
+  "job",
+]);
+
+const extractKeywords = (text) => {
+  return Array.from(
+    new Set(
+      String(text || "")
+        .toLowerCase()
+        .split(/[^a-z0-9+.#-]+/)
+        .filter((w) => w.length > 2 && !STOP_WORDS.has(w))
+    )
+  );
+};
+
+const GEMINI_MODEL_CANDIDATES = [
+  "gemini-2.0-flash",
+  "gemini-2.0-flash-lite",
+  "gemini-1.5-flash-latest",
+  "gemini-1.5-flash",
+  "gemini-1.5-pro",
+];
+
+const getGeminiClient = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey.toLowerCase().includes("replace")) {
+    return null;
+  }
+
+  return new GoogleGenerativeAI(apiKey);
+};
+
+const parseJsonFromGemini = (rawText) => {
+  const cleaned = String(rawText || "")
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/```$/i, "")
+    .trim();
+
+  return JSON.parse(cleaned);
+};
+
+const runGeminiJsonPrompt = async (prompt) => {
+  const client = getGeminiClient();
+  if (!client) {
+    return { ok: false, reason: "missing_key" };
+  }
+
+  let lastError = null;
+
+  for (const modelName of GEMINI_MODEL_CANDIDATES) {
+    try {
+      const model = client.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      const parsed = parseJsonFromGemini(result.response.text());
+      return { ok: true, parsed, model: modelName };
+    } catch (error) {
+      lastError = error;
+      const msg = String(error?.message || "").toLowerCase();
+      const status = Number(error?.status || 0);
+      const isUnsupportedModel =
+        status === 404 ||
+        status === 400 ||
+        msg.includes("not found") ||
+        msg.includes("not supported") ||
+        msg.includes("models/");
+
+      if (isUnsupportedModel) {
+        continue;
+      }
+    }
+  }
+
+  return { ok: false, reason: "api_error", error: lastError };
+};
+
+const ensureStudent = async (userId) => {
+  const user = await User.findById(userId).select("role fullname");
+  if (!user) {
+    return { code: 404, error: "User not found" };
+  }
+  if (String(user.role || "").toLowerCase() !== "student") {
+    return { code: 403, error: "Preparation tools are only available for students" };
+  }
+  return { user };
+};
+
+const getJobContext = async (jobId) => {
+  const job = await Job.findById(jobId).populate("company", "name");
+  if (!job) return null;
+
+  const requirements = Array.isArray(job.requirements) ? job.requirements.join(", ") : "";
+  return {
+    _id: job._id,
+    title: job.title,
+    company: job.company?.name || "Unknown",
+    description: job.description,
+    requirements,
+    location: job.location,
+    experienceLevel: job.experienceLevel,
+    jobType: job.jobType,
+  };
+};
+
+const generatePreparationFallback = (jobContext, count) => {
+  const base = extractKeywords(`${jobContext.title} ${jobContext.description} ${jobContext.requirements}`).slice(0, 12);
+  const questions = Array.from({ length: count }).map((_, idx) => {
+    const k = base[idx % Math.max(base.length, 1)] || "this role";
+    return {
+      question: `How would you apply ${k} in a ${jobContext.title} project?`,
+      answer: `Explain a real example, your approach, trade-offs, and measurable outcome relevant to ${jobContext.company}.`,
+    };
+  });
+  return {
+    title: `${jobContext.title} Preparation Set`,
+    questions,
+  };
+};
+
+export const generatePreparationQuestions = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const count = Math.min(30, Math.max(20, Number(req.query.count) || 20));
+
+    const studentCheck = await ensureStudent(req.id);
+    if (studentCheck.error) {
+      return res.status(studentCheck.code).json({ success: false, message: studentCheck.error });
+    }
+
+    const jobContext = await getJobContext(jobId);
+    if (!jobContext) {
+      return res.status(404).json({ success: false, message: "Job not found" });
+    }
+
+    const prompt = `Generate ${count} interview preparation Q&A items for a student applying to this job.
+Return ONLY valid JSON with this exact shape:
+{
+  "title": "string",
+  "questions": [
+    {"question": "string", "answer": "string"}
+  ]
+}
+
+Job context:
+Title: ${jobContext.title}
+Company: ${jobContext.company}
+Description: ${jobContext.description}
+Requirements: ${jobContext.requirements}
+Experience level: ${jobContext.experienceLevel}
+Job type: ${jobContext.jobType}
+Location: ${jobContext.location}
+
+Rules:
+- Questions should be practical and role-specific.
+- Answers should be concise model answers (3-6 lines).
+- No markdown, no code fences, only JSON.`;
+
+    const gemini = await runGeminiJsonPrompt(prompt);
+    if (!gemini.ok) {
+      const fallback = generatePreparationFallback(jobContext, count);
+      return res.status(200).json({
+        success: true,
+        source: "fallback",
+        message:
+          gemini.reason === "missing_key"
+            ? "Gemini key not configured. Showing local preparation set."
+            : "Gemini unavailable right now. Showing local preparation set.",
+        data: fallback,
+      });
+    }
+
+    const parsed = gemini.parsed;
+
+    if (!parsed?.questions || !Array.isArray(parsed.questions) || parsed.questions.length === 0) {
+      const fallback = generatePreparationFallback(jobContext, count);
+      return res.status(200).json({
+        success: true,
+        source: "fallback",
+        message: "Unexpected AI response. Showing local preparation set.",
+        data: fallback,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      source: "gemini",
+      data: {
+        title: parsed.title || `${jobContext.title} Preparation Set`,
+        questions: parsed.questions.slice(0, count),
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error generating preparation questions",
+    });
+  }
+};
+
+export const generateMockInterviewSet = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const count = Math.min(12, Math.max(6, Number(req.query.count) || 8));
+
+    const studentCheck = await ensureStudent(req.id);
+    if (studentCheck.error) {
+      return res.status(studentCheck.code).json({ success: false, message: studentCheck.error });
+    }
+
+    const jobContext = await getJobContext(jobId);
+    if (!jobContext) {
+      return res.status(404).json({ success: false, message: "Job not found" });
+    }
+
+    const prompt = `Create a realistic mock interview set for a student candidate.
+Return ONLY valid JSON in this shape:
+{
+  "intro": "string",
+  "tips": ["string"],
+  "questions": ["string"]
+}
+
+Job context:
+Title: ${jobContext.title}
+Company: ${jobContext.company}
+Description: ${jobContext.description}
+Requirements: ${jobContext.requirements}
+Experience level: ${jobContext.experienceLevel}
+
+Rules:
+- Provide ${count} questions.
+- Mix: technical, scenario-based, behavioral, problem-solving.
+- Keep questions interview-realistic and concise.
+- No markdown, no code fences, JSON only.`;
+
+    const gemini = await runGeminiJsonPrompt(prompt);
+    if (!gemini.ok) {
+      const fallback = {
+        intro: `Mock interview for ${jobContext.title} at ${jobContext.company}`,
+        tips: [
+          "Keep answers structured: Situation, Task, Action, Result.",
+          "Speak clearly and keep each answer between 45-90 seconds.",
+          "Use one concrete project example per answer.",
+        ],
+        questions: generatePreparationFallback(jobContext, count).questions.map((q) => q.question),
+      };
+
+      return res.status(200).json({
+        success: true,
+        source: "fallback",
+        message:
+          gemini.reason === "missing_key"
+            ? "Gemini key not configured. Showing local mock questions."
+            : "Gemini unavailable right now. Showing local mock questions.",
+        data: fallback,
+      });
+    }
+
+    const parsed = gemini.parsed;
+
+    if (!Array.isArray(parsed?.questions) || parsed.questions.length === 0) {
+      const fallback = {
+        intro: `Mock interview for ${jobContext.title} at ${jobContext.company}`,
+        tips: [
+          "Keep answers structured: Situation, Task, Action, Result.",
+          "Speak clearly and keep each answer between 45-90 seconds.",
+          "Use one concrete project example per answer.",
+        ],
+        questions: generatePreparationFallback(jobContext, count).questions.map((q) => q.question),
+      };
+
+      return res.status(200).json({
+        success: true,
+        source: "fallback",
+        message: "Unexpected AI response. Showing local mock questions.",
+        data: fallback,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      source: "gemini",
+      data: {
+        intro: parsed.intro || `Mock interview for ${jobContext.title}`,
+        tips: Array.isArray(parsed.tips) ? parsed.tips.slice(0, 6) : [],
+        questions: parsed.questions.slice(0, count),
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error generating mock interview",
+    });
+  }
+};
+
+export const evaluateMockInterviewAnswers = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { answers } = req.body;
+
+    const studentCheck = await ensureStudent(req.id);
+    if (studentCheck.error) {
+      return res.status(studentCheck.code).json({ success: false, message: studentCheck.error });
+    }
+
+    const jobContext = await getJobContext(jobId);
+    if (!jobContext) {
+      return res.status(404).json({ success: false, message: "Job not found" });
+    }
+
+    if (!Array.isArray(answers) || answers.length === 0) {
+      return res.status(400).json({ success: false, message: "Interview answers are required" });
+    }
+
+    const sanitizedAnswers = answers
+      .map((a) => ({
+        question: String(a?.question || "").trim(),
+        answer: String(a?.answer || "").trim(),
+      }))
+      .filter((a) => a.question && a.answer);
+
+    if (sanitizedAnswers.length === 0) {
+      return res.status(400).json({ success: false, message: "Provide at least one answered question" });
+    }
+
+    const prompt = `Evaluate this student's mock interview answers for job readiness.
+Return ONLY valid JSON with exact structure:
+{
+  "overallScore": number,
+  "verdict": "string",
+  "strengths": ["string"],
+  "improvements": ["string"],
+  "perQuestion": [
+    {"question": "string", "score": number, "feedback": "string"}
+  ]
+}
+
+Score rules:
+- overallScore: 0-100
+- perQuestion.score: 1-10
+- feedback should be actionable and concise.
+
+Job context:
+Title: ${jobContext.title}
+Company: ${jobContext.company}
+Description: ${jobContext.description}
+Requirements: ${jobContext.requirements}
+
+Answers:
+${JSON.stringify(sanitizedAnswers)}
+
+No markdown, no code fences, JSON only.`;
+
+    const gemini = await runGeminiJsonPrompt(prompt);
+    if (!gemini.ok) {
+      return res.status(200).json({
+        success: true,
+        source: "fallback",
+        data: {
+          overallScore: 65,
+          verdict: "Moderate interview readiness",
+          strengths: [
+            "You attempted answers for the selected role.",
+            "Your responses include relevant role context.",
+          ],
+          improvements: [
+            "Use STAR structure in each answer.",
+            "Add measurable impact and outcomes.",
+            "Be more concise and role-specific.",
+          ],
+          perQuestion: sanitizedAnswers.map((a) => ({
+            question: a.question,
+            score: 6,
+            feedback: "Good start. Add clearer structure, impact metrics, and deeper technical detail.",
+          })),
+        },
+        message: "Gemini key not configured. Showing local feedback template.",
+      });
+    }
+
+    const parsed = gemini.parsed;
+
+    if (typeof parsed?.overallScore !== "number" || !Array.isArray(parsed?.perQuestion)) {
+      return res.status(200).json({
+        success: true,
+        source: "fallback",
+        message: "Unexpected AI response. Showing local feedback template.",
+        data: {
+          overallScore: 65,
+          verdict: "Moderate interview readiness",
+          strengths: [
+            "You attempted answers for the selected role.",
+            "Your responses include relevant role context.",
+          ],
+          improvements: [
+            "Use STAR structure in each answer.",
+            "Add measurable impact and outcomes.",
+            "Be more concise and role-specific.",
+          ],
+          perQuestion: sanitizedAnswers.map((a) => ({
+            question: a.question,
+            score: 6,
+            feedback: "Good start. Add clearer structure, impact metrics, and deeper technical detail.",
+          })),
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      source: "gemini",
+      data: {
+        overallScore: Math.max(0, Math.min(100, Math.round(parsed.overallScore))),
+        verdict: parsed.verdict || "Interview readiness generated",
+        strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 8) : [],
+        improvements: Array.isArray(parsed.improvements) ? parsed.improvements.slice(0, 8) : [],
+        perQuestion: parsed.perQuestion.slice(0, sanitizedAnswers.length),
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error evaluating mock interview answers",
+    });
+  }
+};
 
 export const register = async (req, res) => {
   try {
     const { fullname, email, phoneNumber, password, adharcard, pancard, role } = req.body;
+    const normalizedEmail = email?.trim().toLowerCase();
 
-    if (!fullname || !email || !phoneNumber || !password || !role || !pancard || !adharcard) {
+    const normalizedPan = pancard?.trim() || undefined;
+    const normalizedAdhar = adharcard?.trim() || undefined;
+
+    if (!fullname || !normalizedEmail || !phoneNumber || !password || !role) {
       return res.status(400).json({
         message: "Missing required fields",
         success: false,
       });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
     if (user) {
       return res.status(400).json({
         message: "Email already exists",
@@ -23,45 +517,56 @@ export const register = async (req, res) => {
       });
     }
 
-    const existingAdharcard = await User.findOne({ adharcard });
-    if (existingAdharcard) {
+    const existingPhone = await User.findOne({ phoneNumber });
+    if (existingPhone) {
       return res.status(400).json({
-        message: "Adhar number already exists",
+        message: "Phone number already exists",
         success: false,
       });
     }
 
-    const existingPancard = await User.findOne({ pancard });
-    if (existingPancard) {
-      return res.status(400).json({
-        message: "Pan number already exists",
-        success: false,
-      });
+    if (normalizedAdhar) {
+      const existingAdharcard = await User.findOne({ adharcard: normalizedAdhar });
+      if (existingAdharcard) {
+        return res.status(400).json({
+          message: "Adhar number already exists",
+          success: false,
+        });
+      }
+    }
+
+    if (normalizedPan) {
+      const existingPancard = await User.findOne({ pancard: normalizedPan });
+      if (existingPancard) {
+        return res.status(400).json({
+          message: "Pan number already exists",
+          success: false,
+        });
+      }
     }
 
     const file = req.file;
-    if (!file) {
-      return res.status(400).json({
-        message: "Profile image is required",
-        success: false,
-      });
-    }
+    let profilePhoto = "";
 
-    const fileUri = getDataUri(file);
-    const cloudResponse = await cloudinary.uploader.upload(fileUri.content);
+    if (file && isCloudinaryConfigured()) {
+      const fileUri = getDataUri(file);
+      const cloudResponse = await cloudinary.uploader.upload(fileUri.content);
+      profilePhoto = cloudResponse.secure_url;
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = new User({
       fullname,
-      email,
+      email: normalizedEmail,
       phoneNumber,
-      adharcard,
-      pancard,
+      adharcard: normalizedAdhar,
+      pancard: normalizedPan,
       password: hashedPassword,
       role,
+      authProvider: "local",
       profile: {
-        profilePhoto: cloudResponse.secure_url,
+        profilePhoto,
       },
     });
 
@@ -73,8 +578,121 @@ export const register = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+    if (error?.code === 11000 && error?.keyPattern) {
+      const duplicateField = Object.keys(error.keyPattern)[0];
+      const fieldLabels = {
+        email: "Email",
+        phoneNumber: "Phone number",
+        pancard: "PAN number",
+        adharcard: "Adhar number",
+      };
+
+      return res.status(400).json({
+        message: `${fieldLabels[duplicateField] || duplicateField} already exists`,
+        success: false,
+      });
+    }
     res.status(500).json({
       message: "Server Error registering user",
+      success: false,
+    });
+  }
+};
+
+export const googleAuth = async (req, res) => {
+  try {
+    const { credential, role } = req.body;
+
+    if (!credential || !role) {
+      return res.status(400).json({
+        message: "Google credential and role are required",
+        success: false,
+      });
+    }
+
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(500).json({
+        message: "Google auth is not configured on server",
+        success: false,
+      });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload?.email || !payload.email_verified) {
+      return res.status(401).json({
+        message: "Google email could not be verified",
+        success: false,
+      });
+    }
+
+    const normalizedGoogleEmail = payload.email.trim().toLowerCase();
+    let user = await User.findOne({ email: normalizedGoogleEmail });
+    let createdNewUser = false;
+
+    if (!user) {
+      const randomPassword = crypto.randomUUID();
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+      user = await User.create({
+        fullname: payload.name || payload.email.split("@")[0],
+        email: normalizedGoogleEmail,
+        password: hashedPassword,
+        role,
+        authProvider: "google",
+        googleId: payload.sub,
+        profile: {
+          profilePhoto: payload.picture || "",
+        },
+      });
+      createdNewUser = true;
+    } else if (user.role !== role) {
+      return res.status(403).json({
+        message: `This account is registered as ${user.role}. Please select that role.`,
+        success: false,
+      });
+    } else if (!user.authProvider) {
+      user.authProvider = "google";
+      if (!user.googleId) user.googleId = payload.sub;
+      await user.save();
+    }
+
+    const tokenData = {
+      userId: user._id,
+    };
+    const token = jwt.sign(tokenData, process.env.JWT_SECRET, {
+      expiresIn: "1d",
+    });
+
+    const sanitizedUser = {
+      _id: user._id,
+      fullname: user.fullname,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      adharcard: user.adharcard,
+      pancard: user.pancard,
+      role: user.role,
+      profile: user.profile,
+    };
+
+    return res
+      .status(200)
+      .cookie("token", token, authCookieOptions)
+      .json({
+        message: createdNewUser
+          ? `Account created successfully with Google for ${user.fullname}`
+          : `This email is already registered. Logged in as ${user.fullname}`,
+        user: sanitizedUser,
+        success: true,
+      });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Google authentication failed",
       success: false,
     });
   }
@@ -83,18 +701,26 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password, role } = req.body;
+    const normalizedEmail = email?.trim().toLowerCase();
 
-    if (!email || !password || !role) {
+    if (!normalizedEmail || !password || !role) {
       return res.status(400).json({
         message: "Missing required fields",
         success: false,
       });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(404).json({
         message: "Incorrect email or password",
+        success: false,
+      });
+    }
+
+    if (user.authProvider === "google") {
+      return res.status(400).json({
+        message: "This account was created with Google. Please use Continue with Google.",
         success: false,
       });
     }
@@ -134,11 +760,7 @@ export const login = async (req, res) => {
 
     return res
       .status(200)
-      .cookie("token", token, {
-        maxAge: 24 * 60 * 60 * 1000,
-        httpOnly: true,
-        sameSite: "Strict",
-      })
+      .cookie("token", token, authCookieOptions)
       .json({
         message: `Welcome back ${user.fullname}`,
         user: sanitizedUser,
@@ -155,7 +777,10 @@ export const login = async (req, res) => {
 
 export const logout = async (req, res) => {
   try {
-    return res.status(200).cookie("token", "", { maxAge: 0 }).json({
+    return res
+      .status(200)
+      .cookie("token", "", clearAuthCookieOptions)
+      .json({
       message: "Logged out successfully",
       success: true,
     });
@@ -163,6 +788,41 @@ export const logout = async (req, res) => {
     console.error(error);
     res.status(500).json({
       message: "Server Error logging out",
+      success: false,
+    });
+  }
+};
+
+export const getCurrentUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+        success: false,
+      });
+    }
+
+    const sanitizedUser = {
+      _id: user._id,
+      fullname: user.fullname,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      adharcard: user.adharcard,
+      pancard: user.pancard,
+      role: user.role,
+      profile: user.profile,
+    };
+
+    return res.status(200).json({
+      user: sanitizedUser,
+      success: true,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Server Error getting current user",
       success: false,
     });
   }
@@ -189,11 +849,37 @@ export const updateProfile = async (req, res) => {
     if (bio) user.profile.bio = bio;
     if (skills) user.profile.skills = skills.split(",");
 
+    if (file && !isCloudinaryConfigured()) {
+      return res.status(400).json({
+        message: "Cloudinary is not configured. Remove resume upload or add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET in Backend/.env.",
+        success: false,
+      });
+    }
+
     if (file) {
       const fileUri = getDataUri(file);
-      const cloudResponse = await cloudinary.uploader.upload(fileUri.content);
-      user.profile.resume = cloudResponse.secure_url;
-      user.profile.resumeOriginalName = file.originalname;
+      const isImageFile = file.mimetype?.startsWith("image/");
+
+      if (isImageFile) {
+        const cloudResponse = await cloudinary.uploader.upload(fileUri.content, {
+          resource_type: "image",
+          folder: "profile_photos",
+        });
+        user.profile.profilePhoto = cloudResponse.secure_url;
+      } else {
+        const baseName = file.originalname.replace(/\.[^/.]+$/, "");
+        const safeBaseName = baseName
+          .replace(/[^a-zA-Z0-9_-]/g, "_")
+          .slice(0, 80);
+        const cloudResponse = await cloudinary.uploader.upload(fileUri.content, {
+          resource_type: "raw",
+          folder: "resumes",
+          public_id: `${Date.now()}_${safeBaseName}`,
+          unique_filename: true,
+        });
+        user.profile.resume = cloudResponse.secure_url;
+        user.profile.resumeOriginalname = file.originalname;
+      }
     }
 
     await user.save();
@@ -216,6 +902,272 @@ export const updateProfile = async (req, res) => {
     console.error(error);
     res.status(500).json({
       message: "Server Error updating profile",
+      success: false,
+    });
+  }
+};
+
+const streamResumeFile = async (res, resumeUrl, fileName, inline = false) => {
+  const response = await fetch(resumeUrl);
+  if (!response.ok) {
+    return res.status(502).json({
+      message: "Unable to fetch resume file",
+      success: false,
+    });
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  const rawContentType = response.headers.get("content-type") || "application/pdf";
+  const isPdfByName = (fileName || "").toLowerCase().endsWith(".pdf");
+  const contentType = inline && isPdfByName ? "application/pdf" : rawContentType;
+  const safeFileName = fileName || "resume.pdf";
+
+  res.setHeader("Content-Type", contentType);
+  res.setHeader(
+    "Content-Disposition",
+    `${inline ? "inline" : "attachment"}; filename=\"${safeFileName}\"`
+  );
+  return res.status(200).send(buffer);
+};
+
+export const downloadResume = async (req, res) => {
+  try {
+    const user = await User.findById(req.id);
+
+    if (!user || !user.profile?.resume) {
+      return res.status(404).json({
+        message: "Resume not found",
+        success: false,
+      });
+    }
+
+    return streamResumeFile(
+      res,
+      user.profile.resume,
+      user.profile.resumeOriginalname || "resume.pdf",
+      false
+    );
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Server Error downloading resume",
+      success: false,
+    });
+  }
+};
+
+const getTargetResumeUser = async (req) => {
+  const requester = await User.findById(req.id).select("role");
+  if (!requester) return { error: "User not found", code: 404 };
+
+  const targetUserId = req.params.userId || req.id;
+
+  if (requester.role !== "Recruiter" && String(targetUserId) !== String(req.id)) {
+    return { error: "Access denied", code: 403 };
+  }
+
+  const targetUser = await User.findById(targetUserId);
+  if (!targetUser || !targetUser.profile?.resume) {
+    return { error: "Resume not found", code: 404 };
+  }
+
+  return { targetUser };
+};
+
+export const downloadResumeByUserId = async (req, res) => {
+  try {
+    const result = await getTargetResumeUser(req);
+    if (result.error) {
+      return res.status(result.code).json({ message: result.error, success: false });
+    }
+
+    const { targetUser } = result;
+    return streamResumeFile(
+      res,
+      targetUser.profile.resume,
+      targetUser.profile.resumeOriginalname || "resume.pdf",
+      false
+    );
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Server Error downloading resume",
+      success: false,
+    });
+  }
+};
+
+export const previewResumeByUserId = async (req, res) => {
+  try {
+    const result = await getTargetResumeUser(req);
+    if (result.error) {
+      return res.status(result.code).json({ message: result.error, success: false });
+    }
+
+    const { targetUser } = result;
+    const response = await fetch(targetUser.profile.resume);
+    if (!response.ok) {
+      return res.status(502).json({
+        message: "Unable to fetch resume file",
+        success: false,
+      });
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const base64Pdf = buffer.toString("base64");
+    const displayName = targetUser.profile.resumeOriginalname || "resume.pdf";
+
+    const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Resume Preview</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0f172a; }
+      .bar {
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 14px;
+        color: #e2e8f0;
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+        background: #111827;
+        border-bottom: 1px solid #1f2937;
+      }
+      .viewer { width: 100%; height: calc(100% - 44px); border: 0; }
+      a { color: #93c5fd; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <div class="bar">
+      <span>${displayName}</span>
+      <a href="/api/user/resume/${targetUser._id}/download" target="_blank" rel="noreferrer">Download</a>
+    </div>
+    <iframe class="viewer" src="data:application/pdf;base64,${base64Pdf}"></iframe>
+  </body>
+</html>`;
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    return res.status(200).send(html);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Server Error previewing resume",
+      success: false,
+    });
+  }
+};
+
+export const analyzeResumeByJob = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const user = await User.findById(req.id);
+
+    if (!user || !user.profile?.resume) {
+      return res.status(404).json({
+        message: "Resume not found. Upload a PDF resume first.",
+        success: false,
+      });
+    }
+
+    const job = await Job.findById(jobId).populate("company", "name");
+    if (!job) {
+      return res.status(404).json({
+        message: "Job not found",
+        success: false,
+      });
+    }
+
+    const resumeResponse = await fetch(user.profile.resume);
+    if (!resumeResponse.ok) {
+      return res.status(502).json({
+        message: "Could not fetch resume file for analysis",
+        success: false,
+      });
+    }
+
+    const resumeBuffer = Buffer.from(await resumeResponse.arrayBuffer());
+    let resumeText = "";
+
+    try {
+      const parser = new PDFParse({ data: resumeBuffer });
+      const parsed = await parser.getText();
+      await parser.destroy();
+      resumeText = (parsed?.text || "").toLowerCase();
+    } catch (parseError) {
+      return res.status(400).json({
+        message: "Resume could not be parsed. Please upload a valid PDF resume.",
+        success: false,
+      });
+    }
+
+    if (!resumeText.trim()) {
+      return res.status(400).json({
+        message: "Resume text could not be extracted. Please upload a clean PDF.",
+        success: false,
+      });
+    }
+
+    const requirementText = [job.title, job.description, ...(job.requirements || [])].join(" ");
+    const keywords = extractKeywords(requirementText).slice(0, 60);
+
+    const matchedKeywords = keywords.filter((k) => resumeText.includes(k));
+    const missingKeywords = keywords.filter((k) => !resumeText.includes(k));
+
+    const keywordCoverage = keywords.length
+      ? Math.round((matchedKeywords.length / keywords.length) * 100)
+      : 0;
+
+    const sectionChecks = {
+      hasEmail: /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(resumeText),
+      hasPhone: /(\+\d{1,3}[\s-]?)?\d{10}/.test(resumeText),
+      hasGithub: /github\.com\//i.test(resumeText),
+      hasLinkedin: /linkedin\.com\//i.test(resumeText),
+      hasSkillsSection: /skills?/i.test(resumeText),
+    };
+
+    const sectionScore =
+      Object.values(sectionChecks).filter(Boolean).length / Object.keys(sectionChecks).length;
+
+    const atsScore = Math.round(keywordCoverage * 0.8 + sectionScore * 20);
+
+    const verdict =
+      atsScore >= 80
+        ? "Strong match"
+        : atsScore >= 60
+        ? "Moderate match"
+        : "Needs improvement";
+
+    return res.status(200).json({
+      success: true,
+      analysis: {
+        atsScore,
+        verdict,
+        badge: atsScore >= 80 ? "GREEN" : atsScore >= 60 ? "AMBER" : "RED",
+        keywordCoverage,
+        matchedKeywords: matchedKeywords.slice(0, 20),
+        missingKeywords: missingKeywords.slice(0, 20),
+        sectionChecks,
+        job: {
+          _id: job._id,
+          title: job.title,
+          company: job.company?.name || "Unknown",
+          location: job.location,
+          experienceLevel: job.experienceLevel,
+        },
+        note:
+          "This is an ATS-style estimate based on keyword and section checks. External platforms use their own proprietary scoring.",
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Server Error analyzing resume",
       success: false,
     });
   }

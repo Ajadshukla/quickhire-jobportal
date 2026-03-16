@@ -43,7 +43,7 @@ const CompaniesTable = () => {
   return (
     <div>
       <Table>
-        <TableCaption>Your recent registered Companies</TableCaption>
+        <TableCaption className="text-slate-500">Recent registered companies</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead>Logo</TableHead>
@@ -55,10 +55,12 @@ const CompaniesTable = () => {
 
         <TableBody>
           {filterCompany.length === 0 ? (
-            <span>No Companies Added</span>
+            <TableRow>
+              <TableCell colSpan={4} className="text-center text-slate-500">No companies added</TableCell>
+            </TableRow>
           ) : (
             filterCompany?.map((company) => (
-              <TableRow key={company.id}>
+              <TableRow key={company._id}>
                 <TableCell>
                   <Avatar>
                     <AvatarImage
@@ -71,8 +73,10 @@ const CompaniesTable = () => {
                 <TableCell>{company.createdAt.split("T")[0]}</TableCell>
                 <TableCell className="text-right cursor-pointer">
                   <Popover>
-                    <PopoverTrigger>
+                    <PopoverTrigger asChild>
+                      <button className="rounded-md p-1 hover:bg-slate-100">
                       <MoreHorizontal />
+                      </button>
                     </PopoverTrigger>
                     <PopoverContent className="w-32">
                       <div

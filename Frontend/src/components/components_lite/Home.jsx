@@ -23,12 +23,12 @@ const Home = () => {
   }, []);
 
   return (
-    <div>
+    <div className="qh-page">
       <Navbar />
       <Header />
       <Categories />
-      {loading && <p>Loading jobs...</p>}
-      {error && <p>Error: {error}</p>}
+      {loading && <p className="text-center text-slate-600 py-4">Loading opportunities...</p>}
+      {error && <p className="text-center text-red-600 py-4">Error: {error}</p>}
       {!loading && !error && <LatestJobs jobs={jobs} />}
       <Footer />
     </div>

@@ -1,9 +1,13 @@
 import React from "react";
+import Navbar from "./Navbar";
 
 const TermsOfService = () => {
   return (
-    <div>
-      <h1>Terms and Conditions</h1>
+    <div className="qh-page">
+      <Navbar />
+      <div className="qh-shell py-8">
+      <div className="qh-panel prose prose-slate max-w-none">
+      <h1 className="qh-title text-2xl">Terms and Conditions</h1>
 
       <h2>1. Introduction</h2>
       <p>
@@ -62,6 +66,8 @@ const TermsOfService = () => {
         If you have any questions about these Terms and Conditions, please
         contact us at [Your Contact Information].
       </p>
+      </div>
+      </div>
     </div>
   );
 };

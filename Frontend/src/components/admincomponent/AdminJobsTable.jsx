@@ -48,7 +48,7 @@ const AdminJobsTable = () => {
   return (
     <div>
       <Table>
-        <TableCaption>Your recent Posted Jobs</TableCaption>
+        <TableCaption className="text-slate-500">Recent posted jobs</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead>Company Name</TableHead>
@@ -60,17 +60,21 @@ const AdminJobsTable = () => {
 
         <TableBody>
           {filterJobs.length === 0 ? (
-            <span>No Job Added</span>
+            <TableRow>
+              <TableCell colSpan={4} className="text-center text-slate-500">No job added</TableCell>
+            </TableRow>
           ) : (
             filterJobs?.map((job) => (
-              <TableRow key={job.id}>
+              <TableRow key={job._id}>
                 <TableCell>{job?.company?.name}</TableCell>
                 <TableCell>{job.title}</TableCell>
                 <TableCell>{job.createdAt.split("T")[0]}</TableCell>
                 <TableCell className="text-right cursor-pointer">
                   <Popover>
-                    <PopoverTrigger>
+                    <PopoverTrigger asChild>
+                      <button className="rounded-md p-1 hover:bg-slate-100">
                       <MoreHorizontal />
+                      </button>
                     </PopoverTrigger>
                     <PopoverContent className="w-32">
                       <div

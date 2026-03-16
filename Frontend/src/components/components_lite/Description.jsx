@@ -7,6 +7,7 @@ import axios from "axios";
 import { useDispatch, useSelector } from "react-redux";
 import { setSingleJob } from "@/redux/jobSlice";
 import { toast } from "sonner";
+import Navbar from "./Navbar";
 
 const Description = () => {
   const params = useParams();
@@ -78,26 +79,28 @@ const Description = () => {
   console.log("single jobs", singleJob);
 
   if (!singleJob) {
-    return <div>Loading...</div>;
+    return <div className="qh-page"><Navbar /><div className="qh-shell py-10">Loading...</div></div>;
   }
 
   return (
-    <div>
-      <div className="max-w-7xl mx-auto my-10 ">
-        <div className="flex items-center justify-between">
+    <div className="qh-page">
+      <Navbar />
+      <div className="qh-shell py-8">
+        <div className="qh-panel">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="font-bold text-xl ">{singleJob?.title}</h1>
-            <div className=" flex gap-2 items-center mt-4 ">
-              <Badge className={" text-blue-600 font-bold"} variant={"ghost"}>
+            <h1 className="qh-title text-xl md:text-2xl">{singleJob?.title}</h1>
+            <div className="flex gap-2 items-center mt-4 flex-wrap">
+              <Badge className={"bg-blue-50 text-blue-700 border border-blue-100 font-semibold"}>
                 {singleJob?.position} Open Positions
               </Badge>
-              <Badge className={" text-[#FA4F09] font-bold"} variant={"ghost"}>
+              <Badge className={"bg-amber-50 text-amber-700 border border-amber-100 font-semibold qh-code"}>
                 {singleJob?.salary}LPA
               </Badge>
-              <Badge className={" text-[#6B3AC2]  font-bold"} variant={"ghost"}>
+              <Badge className={"bg-emerald-50 text-emerald-700 border border-emerald-100 font-semibold"}>
                 {singleJob?.location}
               </Badge>
-              <Badge className={" text-black font-bold"} variant={"ghost"}>
+              <Badge className={"bg-slate-100 text-slate-700 border border-slate-200 font-semibold"}>
                 {singleJob?.jobType}
               </Badge>
             </div>
@@ -108,61 +111,62 @@ const Description = () => {
               disabled={isApplied}
               className={`rounded-lg ${
                 isApplied
-                  ? "bg-gray-600 cursor-not-allowed"
-                  : "bg-[#6B3AC2] hover:bg-[#552d9b]"
+                  ? "bg-slate-500 cursor-not-allowed"
+                  : "bg-slate-900 hover:bg-slate-800"
               }`}
             >
               {isApplied ? "Already Applied" : "Apply"}
             </Button>
           </div>
         </div>
-        <h1 className="border-b-2 border-b-gray-400 font-medium py-4">
+        <h1 className="border-b border-b-slate-300 font-medium py-4 text-slate-700">
           {singleJob?.description}
         </h1>
-        <div className="my-4">
-          <h1 className="font-bold my-1 ">
+        <div className="my-4 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+          <h1 className="font-bold my-1">
             Role:{" "}
-            <span className=" pl-4 font-normal text-gray-800">
+            <span className="pl-2 font-normal text-slate-700">
               {singleJob?.position} Open Positions
             </span>
           </h1>
-          <h1 className="font-bold my-1 ">
+          <h1 className="font-bold my-1">
             Location:{" "}
-            <span className=" pl-4 font-normal text-gray-800">
+            <span className="pl-2 font-normal text-slate-700">
               {" "}
               {singleJob?.location}
             </span>
           </h1>
-          <h1 className="font-bold my-1 ">
+          <h1 className="font-bold my-1">
             Salary:{" "}
-            <span className=" pl-4 font-normal text-gray-800">
+            <span className="pl-2 font-normal text-slate-700 qh-code">
               {singleJob?.salary} LPA
             </span>
           </h1>
-          <h1 className="font-bold my-1 ">
+          <h1 className="font-bold my-1">
             Experience:{" "}
-            <span className=" pl-4 font-normal text-gray-800">
+            <span className="pl-2 font-normal text-slate-700">
               {singleJob?.experienceLevel} Year
             </span>
           </h1>
-          <h1 className="font-bold my-1 ">
+          <h1 className="font-bold my-1">
             Total Applicants:{" "}
-            <span className=" pl-4 font-normal text-gray-800">
+            <span className="pl-2 font-normal text-slate-700">
               {singleJob?.applications?.length}
             </span>
           </h1>
-          <h1 className="font-bold my-1 ">
+          <h1 className="font-bold my-1">
             Job Type:
-            <span className=" pl-4 font-normal text-gray-800">
+            <span className="pl-2 font-normal text-slate-700">
               {singleJob?.jobType}
             </span>
           </h1>
-          <h1 className="font-bold my-1 ">
+          <h1 className="font-bold my-1">
             Post Date:
-            <span className=" pl-4 font-normal text-gray-800">
+            <span className="pl-2 font-normal text-slate-700 qh-code">
               {singleJob?.createdAt.split("T")[0]}
             </span>
           </h1>
+        </div>
         </div>
       </div>
     </div>

@@ -37,12 +37,13 @@ const CompanyCreate = () => {
     }
   };
   return (
-    <div>
+    <div className="qh-page">
       <Navbar />
-      <div className="max-w-4xl mx-auto">
-        <div className="my-10">
-          <h1 className="font-bold text-2xl ">Company Name</h1>
-          <p className="text-gray-600">Company Description</p>
+      <div className="qh-shell py-8">
+        <div className="qh-panel max-w-4xl mx-auto">
+        <div className="my-4">
+          <h1 className="qh-title text-2xl">Company Name</h1>
+          <p className="text-slate-600">Create your company profile</p>
         </div>
         <Label>Company Name</Label>
         <Input
@@ -60,6 +61,7 @@ const CompanyCreate = () => {
             Cancel
           </Button>
           <Button onClick={registerNewCompany}>Continue</Button>
+        </div>
         </div>
       </div>
     </div>

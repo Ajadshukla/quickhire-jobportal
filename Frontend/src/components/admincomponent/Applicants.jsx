@@ -28,13 +28,15 @@ const Applicants = () => {
     fetchAllApplicants();
   }, []);
   return (
-    <div>
+    <div className="qh-page">
       <Navbar />
-      <div className="max-w-7xl mx-auto">
-        <h1 className="font-bold text-xl my-5">
+      <div className="qh-shell py-8">
+        <div className="qh-panel">
+        <h1 className="qh-title text-xl my-3">
           Applicants {applicants?.applications?.length}
         </h1>
         <ApplicantsTable />
+        </div>
       </div>
     </div>
   );

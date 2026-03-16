@@ -12,8 +12,8 @@ const userSchema = new mongoose.Schema(
     },
     phoneNumber: {
       type: String,
-      required: true,
       unique: true,
+      sparse: true,
     },
     password: {
       type: String,
@@ -21,19 +21,29 @@ const userSchema = new mongoose.Schema(
     },
     pancard: {
       type: String,
-      required: true,
       unique: true,
+      sparse: true,
     },
     adharcard: {
       type: String,
-      required: true,
       unique: true,
+      sparse: true,
     },
     role: {
       type: String,
       enum: ["Student", "Recruiter"],
       default: "Student",
       required: true,
+    },
+    authProvider: {
+      type: String,
+      enum: ["local", "google"],
+      default: "local",
+    },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
     },
     profile: {
       bio: {

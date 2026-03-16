@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -115,5 +117,138 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: "Manrope", sans-serif;
+    background-image: radial-gradient(rgba(100, 116, 139, 0.08) 0.6px, transparent 0.6px);
+    background-size: 18px 18px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: "Sora", sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  ::selection {
+    background: rgba(20, 184, 166, 0.22);
+    color: #0f172a;
+  }
+
+  .dark body {
+    background-image: radial-gradient(rgba(148, 163, 184, 0.12) 0.6px, transparent 0.6px);
+  }
+
+  .dark ::selection {
+    background: rgba(45, 212, 191, 0.28);
+    color: #e2e8f0;
+  }
+}
+
+@layer components {
+  .qh-display {
+    font-family: "Sora", sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  .qh-code {
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  .qh-glass {
+    @apply bg-white/80 border border-slate-200/80 backdrop-blur-md shadow-[0_14px_35px_rgba(15,23,42,0.08)] dark:bg-slate-900/60 dark:border-slate-700/70 dark:shadow-[0_14px_35px_rgba(2,6,23,0.45)];
+  }
+
+  .qh-chip {
+    @apply rounded-full border border-slate-200 bg-white/90 px-4 py-1 text-sm font-semibold text-slate-700 dark:bg-slate-900/70 dark:border-slate-700 dark:text-slate-200;
+  }
+
+  .qh-page {
+    @apply min-h-screen;
+    background-color: #f8fafc;
+    background-image:
+      radial-gradient(circle at 10% 8%, rgba(13, 148, 136, 0.14), transparent 34%),
+      radial-gradient(circle at 88% 12%, rgba(245, 158, 11, 0.14), transparent 34%),
+      radial-gradient(circle at 14% 68%, rgba(14, 165, 233, 0.1), transparent 38%),
+      radial-gradient(circle at 86% 82%, rgba(34, 197, 94, 0.1), transparent 36%),
+      linear-gradient(to bottom, #f8fafc, #ffffff 45%, #f8fafc);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+  }
+
+  .dark .qh-page {
+    background-color: #020617;
+    background-image:
+      radial-gradient(circle at 10% 8%, rgba(13, 148, 136, 0.2), transparent 34%),
+      radial-gradient(circle at 88% 12%, rgba(245, 158, 11, 0.2), transparent 34%),
+      radial-gradient(circle at 14% 68%, rgba(14, 165, 233, 0.16), transparent 38%),
+      radial-gradient(circle at 86% 82%, rgba(34, 197, 94, 0.14), transparent 36%),
+      linear-gradient(to bottom, #020617, #0f172a 45%, #020617);
+  }
+
+  .qh-shell {
+    @apply mx-auto max-w-7xl px-4 md:px-6;
+  }
+
+  .qh-panel {
+    @apply rounded-2xl border border-slate-200/80 bg-white/85 p-5 md:p-6 shadow-[0_12px_30px_rgba(15,23,42,0.08)] backdrop-blur-sm dark:bg-slate-900/65 dark:border-slate-700/70 dark:shadow-[0_12px_30px_rgba(2,6,23,0.48)];
+  }
+
+  .qh-title {
+    @apply qh-display text-2xl md:text-3xl font-bold text-slate-900 dark:text-slate-100;
+  }
+
+  .qh-subtitle {
+    @apply text-sm md:text-base text-slate-600 dark:text-slate-300;
+  }
+}
+
+@layer utilities {
+  .dark .text-gray-500,
+  .dark .text-slate-500 {
+    color: rgb(148 163 184) !important;
+  }
+
+  .dark .text-gray-600,
+  .dark .text-slate-600 {
+    color: rgb(148 163 184) !important;
+  }
+
+  .dark .text-gray-700,
+  .dark .text-slate-700 {
+    color: rgb(203 213 225) !important;
+  }
+
+  .dark .text-gray-800,
+  .dark .text-slate-800 {
+    color: rgb(226 232 240) !important;
+  }
+
+  .dark .text-gray-900,
+  .dark .text-slate-900 {
+    color: rgb(241 245 249) !important;
+  }
+
+  .dark .bg-slate-50,
+  .dark .bg-slate-100 {
+    background-color: rgb(15 23 42 / 0.7) !important;
+  }
+
+  .dark .bg-white,
+  .dark .bg-white\/85,
+  .dark .bg-white\/90,
+  .dark .bg-white\/95 {
+    background-color: rgb(15 23 42 / 0.72) !important;
+  }
+
+  .dark .border-slate-200,
+  .dark .border-slate-200\/70,
+  .dark .border-slate-200\/80,
+  .dark .border-gray-200,
+  .dark .border-gray-300,
+  .dark .border-gray-500 {
+    border-color: rgb(51 65 85 / 0.9) !important;
   }
 }

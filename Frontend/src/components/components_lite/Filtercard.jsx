@@ -54,18 +54,18 @@ const Filter = () => {
   }, [selectedValue]);
 
   return (
-    <div className="w-full bg-white rounded-md">
-      <h1 className="font-bold text-lg">Filter Jobs</h1>
-      <hr className="mt-3" />
+    <div className="w-full qh-panel sticky top-24">
+      <h1 className="qh-display font-bold text-lg">Filter Jobs</h1>
+      <hr className="mt-3 border-slate-200" />
       <RadioGroup value={selectedValue} onValueChange={handleChange}>
         {filterData.map((data, index) => (
           <div key={index}>
-            <h2 className="font-bold text-lg">{data.filterType}</h2>
+            <h2 className="font-semibold text-slate-800 mt-3">{data.filterType}</h2>
 
             {data.array.map((item, indx) => {
               const itemId = `Id${index}-${indx}`;
               return (
-                <div key={itemId} className="flex items-center space-x-2 my-2">
+                <div key={itemId} className="flex items-center space-x-2 my-2 text-slate-700">
                   <RadioGroupItem value={item} id={itemId}></RadioGroupItem>
                   <label htmlFor={itemId}>{item}</label>
                 </div>

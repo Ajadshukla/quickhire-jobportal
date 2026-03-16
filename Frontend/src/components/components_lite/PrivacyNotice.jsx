@@ -1,7 +1,7 @@
 import React from "react";
 import Navbar from "./Navbar";
 
-const PrivacyPolicy = () => {
+const PrivacyNotice = () => {
   return (
     <div className="qh-page">
       <Navbar />
@@ -93,4 +93,4 @@ const PrivacyPolicy = () => {
   );
 };
 
-export default PrivacyPolicy;
+export default PrivacyNotice;

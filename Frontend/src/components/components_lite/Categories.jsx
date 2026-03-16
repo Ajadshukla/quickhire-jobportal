@@ -39,29 +39,29 @@ const Categories = () => {
       navigate("/browse");
   }
   return (
-    <div>
-      <div>
-        <h1 className="text-2xl font-bold text-center text-blue-600">
+    <div className="max-w-5xl mx-auto px-4 mt-2">
+      <div className="qh-glass rounded-2xl p-6 md:p-8">
+        <h1 className="qh-display text-3xl font-black text-center text-slate-900">
           Categories
         </h1>
-        <p className="text-center text-gray-600">
-          Explore our extensive job market.
+        <p className="text-center text-slate-600 mt-2">
+          Choose a role path.
         </p>
       </div>
-      <Carousel className="w-full   max-w-xl  mx-auto my-10">
+      <Carousel className="w-full max-w-3xl mx-auto my-8">
         <CarouselContent>
           {Category.map((category, index) => {
             return (
-              <CarouselItem className="md:basis-1/2 lg-basis-1/3 ">
-                <Button onClick={() => searchjobHandler(category)}>
+              <CarouselItem key={index} className="md:basis-1/2 lg:basis-1/3">
+                <Button onClick={() => searchjobHandler(category)} className="w-full bg-slate-900 hover:bg-slate-800 rounded-full">
                   {category}
                 </Button>
               </CarouselItem>
             );
           })}
         </CarouselContent>
-        <CarouselPrevious />
-        <CarouselNext />
+        <CarouselPrevious className="border-slate-300" />
+        <CarouselNext className="border-slate-300" />
       </Carousel>
     </div>
   );

@@ -1,14 +1,14 @@
-import React from "react";
-import Navbar from "./components/components_lite/Navbar";
+import React, { useEffect } from "react";
 import Login from "./components/authentication/Login";
 import Register from "./components/authentication/Register";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import Home from "./components/components_lite/Home";
-import PrivacyPolicy from "./components/components_lite/PrivacyPolicy.jsx";
+import PrivacyNotice from "./components/components_lite/PrivacyNotice.jsx";
 import TermsofService from "./components/components_lite/TermsofService.jsx";
 import Jobs from "./components/components_lite/Jobs.jsx";
 import Browse from "./components/components_lite/Browse.jsx";
 import Profile from "./components/components_lite/Profile.jsx";
+import Preparation from "./components/components_lite/Preparation.jsx";
 import Description from "./components/components_lite/Description.jsx";
 import Companies from "./components/admincomponent/Companies";
 import CompanyCreate from "./components/admincomponent/CompanyCreate";
@@ -17,7 +17,11 @@ import AdminJobs from "./components/admincomponent/AdminJobs.jsx";
 import PostJob from "./components/admincomponent/PostJob";
 import Applicants from "./components/admincomponent/Applicants";
 import ProtectedRoute from "./components/admincomponent/ProtectedRoute";
-import Creator from "./components/creator/Creator.jsx";
+import AuthProtectedRoute from "./components/admincomponent/AuthProtectedRoute";
+import axios from "axios";
+import { USER_API_ENDPOINT } from "./utils/data";
+import { useDispatch } from "react-redux";
+import { setAuthChecked, setUser } from "./redux/authSlice";
 
 const appRouter = createBrowserRouter([
   { path: "/", element: <Home /> },
@@ -35,11 +39,23 @@ const appRouter = createBrowserRouter([
   },
   {
     path: "/Profile",
-    element: <Profile />,
+    element: (
+      <AuthProtectedRoute>
+        <Profile />
+      </AuthProtectedRoute>
+    ),
+  },
+  {
+    path: "/Preparation",
+    element: (
+      <AuthProtectedRoute requiredRole="Student">
+        <Preparation />
+      </AuthProtectedRoute>
+    ),
   },
   {
     path: "/PrivacyPolicy",
-    element: <PrivacyPolicy />,
+    element: <PrivacyNotice />,
   },
   {
     path: "/TermsofService",
@@ -59,7 +75,7 @@ const appRouter = createBrowserRouter([
   },
   {
     path:"/Creator",
-    element: <Creator/>
+    element: <Home/>
   },
 
   // /admin
@@ -116,6 +132,29 @@ const appRouter = createBrowserRouter([
 ]);
 
 function App() {
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    const bootstrapAuth = async () => {
+      try {
+        const res = await axios.get(`${USER_API_ENDPOINT}/me`, {
+          withCredentials: true,
+        });
+        if (res.data?.success) {
+          dispatch(setUser(res.data.user));
+        } else {
+          dispatch(setUser(null));
+        }
+      } catch {
+        dispatch(setUser(null));
+      } finally {
+        dispatch(setAuthChecked(true));
+      }
+    };
+
+    bootstrapAuth();
+  }, [dispatch]);
+
   return (
     <div>
       <RouterProvider router={appRouter}></RouterProvider>

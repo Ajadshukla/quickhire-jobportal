@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import Navbar from "../components_lite/Navbar";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { RadioGroup } from "../ui/radio-group";
 import { Link } from "react-router-dom";
 import axios from "axios";
@@ -10,8 +10,13 @@ import { toast } from "sonner";
 import { USER_API_ENDPOINT } from "@/utils/data.js";
 import { useDispatch, useSelector } from "react-redux";
 import { setLoading, setUser } from "@/redux/authSlice";
+import { GoogleLogin } from "@react-oauth/google";
+import { Button } from "../ui/button";
 
 const Login = () => {
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+  const isGoogleEnabled =
+    Boolean(googleClientId) && !googleClientId.toLowerCase().includes("replace_with");
   const [input, setInput] = useState({
     email: "",
     password: "", 
@@ -22,9 +27,6 @@ const Login = () => {
   const { loading, user } = useSelector((store) => store.auth);
   const changeEventHandler = (e) => {
     setInput({ ...input, [e.target.name]: e.target.value });
-  };
-  const ChangeFilehandler = (e) => {
-    setInput({ ...input, file: e.target.files?.[0] });
   };
 
   const submitHandler = async (e) => {
@@ -42,9 +44,43 @@ const Login = () => {
         toast.success(res.data.message);
       }
     } catch (error) {
-      toast.error("Login failed");
+      const message = error.response?.data?.message || "Login failed";
+      toast.error(message);
     } finally {
       dispatch(setLoading(false)); // End loading
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    if (!input.role) {
+      toast.error("Please select role before Google sign in.");
+      return;
+    }
+
+    try {
+      dispatch(setLoading(true));
+      const res = await axios.post(
+        `${USER_API_ENDPOINT}/google`,
+        {
+          credential: credentialResponse.credential,
+          role: input.role,
+        },
+        {
+          headers: { "Content-Type": "application/json" },
+          withCredentials: true,
+        }
+      );
+
+      if (res.data.success) {
+        dispatch(setUser(res.data.user));
+        toast.success(res.data.message);
+        navigate("/");
+      }
+    } catch (error) {
+      const message = error.response?.data?.message || "Google login failed";
+      toast.error(message);
+    } finally {
+      dispatch(setLoading(false));
     }
   };
 
@@ -55,17 +91,17 @@ const Login = () => {
   }, []);
 
   return (
-    <div>
+    <div className="qh-page">
       <Navbar></Navbar>
-      <div className="flex items-center justify-center max-w-7xl mx-auto">
+      <div className="qh-shell flex items-center justify-center py-10">
         <form
           onSubmit={submitHandler}
-          className="w-1/2 border border-gray-500 rounded-md p-4 my-10"
+          className="w-full max-w-xl qh-panel"
         >
-          <h1 className="font-bold text-xl mb-5 text-center text-blue-600">
+          <h1 className="qh-title mb-5 text-center text-slate-900">
             Login
           </h1>
-          <div className="my-2">
+          <div className="my-3">
             <Label>Email</Label>
             <Input
               type="email"
@@ -75,7 +111,7 @@ const Login = () => {
               placeholder="johndoe@gmail.com"
             ></Input>
           </div>
-          <div className="my-2">
+          <div className="my-3">
             <Label>Password</Label>
             <Input
               type="password"
@@ -87,7 +123,7 @@ const Login = () => {
           </div>
            
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between qh-panel p-3">
             <RadioGroup className="flex items-center gap-4 my-5 ">
               <div className="flex items-center space-x-2">
                 <Input
@@ -121,23 +157,37 @@ const Login = () => {
               </div>
             </div>
           ) : (
-            <button
+            <Button
               type="submit"
-              className="w-3/4 py-3 my-3 text-white flex items-center justify-center max-w-7xl mx-auto bg-blue-600 hover:bg-blue-800/90 rounded-md"
+              className="w-full mt-4"
             >
               Login
-            </button>
+            </Button>
           )}
 
-          <div className=" ">
-            <p className="text-gray-700  text-center my-2">
-              Create new Account{" "}
-              <Link to="/register" className="text-blue-700">
-                <button className=" w-1/2 py-3 my-3 text-white flex items-center justify-center max-w-7xl mx-auto bg-green-600 hover:bg-green-800/90 rounded-md">
-                  Register
-                </button>
-              </Link>
+          {isGoogleEnabled && (
+            <div className="flex justify-center my-3">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => toast.error("Google sign in failed")}
+                text="continue_with"
+                shape="pill"
+              />
+            </div>
+          )}
+          {!isGoogleEnabled && (
+            <p className="text-xs text-gray-500 dark:text-slate-400 text-center my-2">
+              Google sign in will appear after setting VITE_GOOGLE_CLIENT_ID in Frontend/.env.
             </p>
+          )}
+
+          <div>
+            <p className="text-slate-700 dark:text-slate-300 text-center my-3">
+              New here?
+            </p>
+            <Link to="/register" className="block">
+              <Button variant="outline" className="w-full">Register</Button>
+            </Link>
           </div>
         </form>
       </div>
