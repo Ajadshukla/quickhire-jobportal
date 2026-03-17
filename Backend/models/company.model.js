@@ -22,6 +22,22 @@ const companySchema = new mongoose.Schema({
         type:mongoose.Schema.Types.ObjectId,
         ref:'User',
         required:true
+    },
+    verificationStatus: {
+        type: String,
+        enum: ["pending", "verified", "rejected"],
+        default: "pending"
+    },
+    verifiedAt: {
+        type: Date
+    },
+    verifiedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    verificationNote: {
+        type: String,
+        default: ""
     }
 },{timestamps:true})
 export const Company = mongoose.model("Company", companySchema);

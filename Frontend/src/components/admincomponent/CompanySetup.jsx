@@ -22,6 +22,12 @@ const CompanySetup = () => {
     file: null,
   });
   const { singleCompany } = useSelector((store) => store.company);
+  const [initialInput, setInitialInput] = useState({
+    name: "",
+    description: "",
+    website: "",
+    location: "",
+  });
 
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -35,8 +41,22 @@ const CompanySetup = () => {
     setInput({ ...input, file });
   };
 
+  const normalize = (value) => String(value || "").trim();
+  const hasActualChanges =
+    normalize(input.name) !== normalize(initialInput.name) ||
+    normalize(input.description) !== normalize(initialInput.description) ||
+    normalize(input.website) !== normalize(initialInput.website) ||
+    normalize(input.location) !== normalize(initialInput.location) ||
+    Boolean(input.file);
+
   const submitHandler = async (e) => {
     e.preventDefault();
+
+    if (!hasActualChanges) {
+      toast.info("No changes detected. Update at least one field before saving.");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("name", input.name);
     formData.append("description", input.description);
@@ -57,10 +77,11 @@ const CompanySetup = () => {
           withCredentials: true,
         }
       );
-      console.log(res); // Debugging API response
-
-      // Assuming a successful response has a `message` property
       if (res.status === 200 && res.data.message) {
+        if (res.data.changed === false) {
+          toast.info(res.data.message);
+          return;
+        }
         toast.success(res.data.message);
         navigate("/admin/companies");
       } else {
@@ -76,12 +97,16 @@ const CompanySetup = () => {
   };
 
   useEffect(() => {
-    setInput({
+    const loaded = {
       name: singleCompany.name || "",
       description: singleCompany.description || "",
       website: singleCompany.website || "",
       location: singleCompany.location || "",
-      file: singleCompany.file || null,
+    };
+    setInitialInput(loaded);
+    setInput({
+      ...loaded,
+      file: null,
     });
   }, [singleCompany]);
 
@@ -92,6 +117,7 @@ const CompanySetup = () => {
         <form onSubmit={submitHandler} className="qh-panel max-w-3xl mx-auto">
           <div className="flex items-center gap-5 pb-4">
             <Button
+              type="button"
               onClick={() => navigate("/admin/companies")}
               variant="outline"
               className="flex items-center gap-2 text-slate-600 font-semibold"
@@ -101,6 +127,27 @@ const CompanySetup = () => {
             </Button>
             <h1 className="qh-title text-xl">Company Setup</h1>
           </div>
+
+          {singleCompany?.verificationStatus === "rejected" && (
+            <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <p className="font-semibold">This company is rejected by owner.</p>
+              {singleCompany?.verificationNote && <p>Reason: {singleCompany.verificationNote}</p>}
+              <p>Update details and save to resubmit it for verification.</p>
+            </div>
+          )}
+
+          {singleCompany?.verificationStatus === "pending" && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              Company is under owner review. Job posting is disabled until verification.
+            </div>
+          )}
+
+          {singleCompany?.verificationStatus === "verified" && (
+            <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              Company is verified. You can post jobs for this company.
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Company Name</Label>

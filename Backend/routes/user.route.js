@@ -12,7 +12,11 @@ import {
   logout,
   previewResumeByUserId,
   register,
+  sendEmailOtp,
+  sendPhoneOtp,
   updateProfile,
+  verifyEmailOtp,
+  verifyPhoneOtp,
 } from "../controllers/user.controller.js";
 import authenticateToken from "../middleware/isAuthenticated.js";
 import { singleUpload } from "../middleware/multer.js";
@@ -20,6 +24,10 @@ import { singleUpload } from "../middleware/multer.js";
 const router = express.Router();
 
 router.route("/register").post(singleUpload, register);
+router.route("/email-otp/send").post(sendEmailOtp);
+router.route("/email-otp/verify").post(verifyEmailOtp);
+router.route("/phone-otp/send").post(sendPhoneOtp);
+router.route("/phone-otp/verify").post(verifyPhoneOtp);
 router.route("/login").post(login);
 router.route("/google").post(googleAuth);
 router.route("/logout").post(logout);

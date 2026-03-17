@@ -17,6 +17,12 @@ import { Loader2 } from "lucide-react";
 
 const EditProfileModal = ({ open, setOpen }) => {
   const [loading, setLoading] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailVerificationToken, setEmailVerificationToken] = useState("");
   const { user } = useSelector((store) => store.auth);
 
   const [input, setInput] = useState({
@@ -29,18 +35,105 @@ const EditProfileModal = ({ open, setOpen }) => {
   });
   const dispatch = useDispatch();
 
+  const normalizedOriginalEmail = String(user?.email || "").trim().toLowerCase();
+  const normalizedCurrentEmail = String(input.email || "").trim().toLowerCase();
+  const hasEmailChanged = Boolean(normalizedCurrentEmail) && normalizedCurrentEmail !== normalizedOriginalEmail;
+
   const changeEventHandler = (e) => {
+    if (e.target.name === "email") {
+      setOtpCode("");
+      setOtpSent(false);
+      setEmailVerified(false);
+      setEmailVerificationToken("");
+    }
     setInput({ ...input, [e.target.name]: e.target.value });
+  };
+
+  const sendEmailOtpHandler = async () => {
+    const email = String(input.email || "").trim().toLowerCase();
+    if (!email) {
+      toast.error("Enter email first.");
+      return;
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      toast.error("Enter a valid email address.");
+      return;
+    }
+
+    try {
+      setOtpSending(true);
+      const res = await axios.post(
+        `${USER_API_ENDPOINT}/email-otp/send`,
+        { email, purpose: "update_email" },
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      if (res.data?.success) {
+        setOtpSent(true);
+        setEmailVerified(false);
+        setEmailVerificationToken("");
+        toast.success(res.data.message);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Unable to send OTP");
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const verifyEmailOtpHandler = async () => {
+    const email = String(input.email || "").trim().toLowerCase();
+    const otp = String(otpCode || "").trim();
+
+    if (!email || !otp) {
+      toast.error("Enter email and OTP.");
+      return;
+    }
+
+    try {
+      setOtpVerifying(true);
+      const res = await axios.post(
+        `${USER_API_ENDPOINT}/email-otp/verify`,
+        { email, otp, purpose: "update_email" },
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      if (res.data?.success) {
+        setEmailVerified(true);
+        setEmailVerificationToken(res.data.verificationToken || "");
+        setInput((prev) => ({
+          ...prev,
+          email: res.data.normalizedEmail || prev.email,
+        }));
+        toast.success(res.data.message);
+      }
+    } catch (error) {
+      setEmailVerified(false);
+      setEmailVerificationToken("");
+      toast.error(error.response?.data?.message || "OTP verification failed");
+    } finally {
+      setOtpVerifying(false);
+    }
   };
 
   const handleFileChange = async (e) => {
     e.preventDefault();
+
+    if (hasEmailChanged && (!emailVerified || !emailVerificationToken)) {
+      toast.error("Please verify the new email with OTP before saving.");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("fullname", input.fullname);
     formData.append("email", input.email);
     formData.append("phoneNumber", input.phoneNumber);
     formData.append("bio", input.bio);
     formData.append("skills", input.skills);
+    if (hasEmailChanged) {
+      formData.append("emailVerificationToken", emailVerificationToken);
+    }
 
     if (input.file) {
       formData.append("file", input.file);
@@ -109,14 +202,48 @@ const EditProfileModal = ({ open, setOpen }) => {
                 <Label htmlFor="email" className="text-right">
                   Email
                 </Label>
-                <input
-                  type="email"
-                  id="email"
-                  value={input.email}
-                  name="email"
-                  onChange={changeEventHandler}
-                  className="col-span-3 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md p-2"
-                />
+                <div className="col-span-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      id="email"
+                      value={input.email}
+                      name="email"
+                      onChange={changeEventHandler}
+                      className="flex-1 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md p-2"
+                    />
+                    {hasEmailChanged && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={sendEmailOtpHandler}
+                        disabled={otpSending}
+                      >
+                        {otpSending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send OTP"}
+                      </Button>
+                    )}
+                  </div>
+
+                  {hasEmailChanged && otpSent && !emailVerified && (
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        type="text"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value)}
+                        placeholder="Enter 6-digit OTP"
+                        maxLength={6}
+                        className="flex-1 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md p-2"
+                      />
+                      <Button type="button" onClick={verifyEmailOtpHandler} disabled={otpVerifying}>
+                        {otpVerifying ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+                      </Button>
+                    </div>
+                  )}
+
+                  {hasEmailChanged && emailVerified && (
+                    <p className="text-xs text-emerald-600 mt-1">New email verified</p>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="phone" className="text-right">
@@ -125,8 +252,8 @@ const EditProfileModal = ({ open, setOpen }) => {
                 <input
                   type="tel"
                   id="phone"
-                  value={input.phoneNumber} // Ensure this is correctly set
-                  name="phoneNumber" // Ensure this matches the expected key
+                  value={input.phoneNumber}
+                  name="phoneNumber"
                   onChange={changeEventHandler}
                   className="col-span-3 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-md p-2"
                 />

@@ -11,6 +11,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { setLoading, setUser } from "@/redux/authSlice";
 import { GoogleLogin } from "@react-oauth/google";
 import { Button } from "../ui/button";
+import { Loader2 } from "lucide-react";
 
 const Register = () => {
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
@@ -26,6 +27,13 @@ const Register = () => {
     adharcard: "",
     file: "",
   });
+  const [otpCode, setOtpCode] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [emailOtpVerified, setEmailOtpVerified] = useState(false);
+  const [emailVerificationToken, setEmailVerificationToken] = useState("");
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const navigate = useNavigate();
 
@@ -33,14 +41,116 @@ const Register = () => {
 
   const { loading } = useSelector((store) => store.auth);
   const changeEventHandler = (e) => {
-    setInput({ ...input, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    if (name === "email") {
+      setOtpSent(false);
+      setEmailOtpVerified(false);
+      setOtpCode("");
+      setEmailVerificationToken("");
+    }
+    setInput({ ...input, [name]: value });
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
   };
   const ChangeFilehandler = (e) => {
     setInput({ ...input, file: e.target.files?.[0] });
   };
 
+  const validateRegister = () => {
+    const nextErrors = {};
+
+    if (!String(input.fullname || "").trim()) nextErrors.fullname = "Full name is required";
+    if (!String(input.email || "").trim()) {
+      nextErrors.email = "Email is required";
+    } else if (!/^\S+@\S+\.\S+$/.test(String(input.email).trim())) {
+      nextErrors.email = "Enter a valid email address";
+    }
+    if (!String(input.password || "").trim()) nextErrors.password = "Password is required";
+    if (!String(input.phoneNumber || "").trim()) {
+      nextErrors.phoneNumber = "Phone number is required";
+    } else if (!/^\+?[1-9]\d{7,14}$|^\d{10}$/.test(String(input.phoneNumber).trim())) {
+      nextErrors.phoneNumber = "Enter a valid phone number";
+    }
+    if (!emailOtpVerified || !emailVerificationToken) {
+      nextErrors.emailOtp = "Please verify email with OTP";
+    }
+    if (!String(input.role || "").trim()) nextErrors.role = "Please select a role";
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const sendOtpHandler = async () => {
+    const email = String(input.email || "").trim();
+    if (!email) {
+      setErrors((prev) => ({ ...prev, email: "Email is required" }));
+      toast.error("Enter email first.");
+      return;
+    }
+
+    try {
+      setOtpSending(true);
+      const res = await axios.post(
+        `${USER_API_ENDPOINT}/email-otp/send`,
+        { email, purpose: "register" },
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      if (res.data?.success) {
+        setOtpSent(true);
+        setEmailOtpVerified(false);
+        setEmailVerificationToken("");
+        toast.success(res.data.message);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Unable to send OTP");
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const verifyOtpHandler = async () => {
+    const email = String(input.email || "").trim();
+    const otp = String(otpCode || "").trim();
+
+    if (!email || !otp) {
+      toast.error("Enter email and OTP.");
+      return;
+    }
+
+    try {
+      setOtpVerifying(true);
+      const res = await axios.post(
+        `${USER_API_ENDPOINT}/email-otp/verify`,
+        { email, otp, purpose: "register" },
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      if (res.data?.success) {
+        setEmailOtpVerified(true);
+        setEmailVerificationToken(res.data.verificationToken || "");
+        setErrors((prev) => ({ ...prev, emailOtp: "", email: "" }));
+        setInput((prev) => ({ ...prev, email: res.data.normalizedEmail || prev.email }));
+        toast.success(res.data.message);
+      }
+    } catch (error) {
+      setEmailOtpVerified(false);
+      setEmailVerificationToken("");
+      toast.error(error.response?.data?.message || "OTP verification failed");
+    } finally {
+      setOtpVerifying(false);
+    }
+  };
+
   const submitHandler = async (e) => {
     e.preventDefault();
+
+    if (!validateRegister()) {
+      toast.error("Please fill all required fields correctly.");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("fullname", input.fullname);
     formData.append("email", input.email);
@@ -49,9 +159,11 @@ const Register = () => {
     formData.append("adharcard", input.adharcard);
     formData.append("role", input.role);
     formData.append("phoneNumber", input.phoneNumber);
+    formData.append("emailVerificationToken", emailVerificationToken);
     if (input.file) {
       formData.append("file", input.file);
     }
+    const toastId = toast.loading("Creating your account...");
     try {
       dispatch(setLoading(true));
       const res = await axios.post(`${USER_API_ENDPOINT}/register`, formData, {
@@ -60,14 +172,13 @@ const Register = () => {
       });
       if (res.data.success) {
         navigate("/login");
-        toast.success(res.data.message);
+        toast.success(res.data.message, { id: toastId });
       }
     } catch (error) {
-      console.log(error);
       const errorMessage = error.response
         ? error.response.data.message
         : "An unexpected error occurred.";
-      toast.error(errorMessage);
+      toast.error(errorMessage, { id: toastId });
     } finally {
       dispatch(setLoading(false));
     }
@@ -75,14 +186,18 @@ const Register = () => {
 
   const handleGoogleSuccess = async (credentialResponse) => {
     if (!input.role) {
+      setErrors((prev) => ({ ...prev, role: "Please select a role" }));
       toast.error("Please select role before Google sign up.");
       return;
     }
 
-    if (!input.file) {
-      toast.error("Please select a profile photo before Google sign up.");
+    if (!String(input.phoneNumber || "").trim()) {
+      setErrors((prev) => ({ ...prev, phoneNumber: "Phone number is required" }));
+      toast.error("Phone number is required for Google sign up.");
       return;
     }
+
+    const toastId = toast.loading("Signing up with Google...");
 
     try {
       dispatch(setLoading(true));
@@ -91,6 +206,7 @@ const Register = () => {
         {
           credential: credentialResponse.credential,
           role: input.role,
+          phoneNumber: input.phoneNumber,
         },
         {
           headers: { "Content-Type": "application/json" },
@@ -99,31 +215,39 @@ const Register = () => {
       );
 
       if (res.data.success) {
-        // Upload selected profile photo immediately after Google auth.
-        const profileFormData = new FormData();
-        profileFormData.append("file", input.file);
+        let resolvedUser = res.data.user;
 
-        const profileRes = await axios.post(
-          `${USER_API_ENDPOINT}/profile/update`,
-          profileFormData,
-          {
-            headers: { "Content-Type": "multipart/form-data" },
-            withCredentials: true,
+        // Optional: if user selected a custom photo, upload it after Google auth.
+        if (input.file) {
+          const profileFormData = new FormData();
+          profileFormData.append("file", input.file);
+
+          const profileRes = await axios.post(
+            `${USER_API_ENDPOINT}/profile/update`,
+            profileFormData,
+            {
+              headers: { "Content-Type": "multipart/form-data" },
+              withCredentials: true,
+            }
+          );
+
+          if (profileRes.data.success) {
+            resolvedUser = profileRes.data.user;
           }
-        );
-
-        if (profileRes.data.success) {
-          dispatch(setUser(profileRes.data.user));
-          toast.success("Google sign up completed with profile photo.");
-        } else {
-          dispatch(setUser(res.data.user));
-          toast.success(res.data.message);
         }
+
+        if (!resolvedUser) {
+          dispatch(setUser(res.data.user));
+        } else {
+          dispatch(setUser(resolvedUser));
+        }
+
+        toast.success(res.data.message, { id: toastId });
         navigate("/");
       }
     } catch (error) {
       const message = error.response?.data?.message || "Google sign up failed";
-      toast.error(message);
+      toast.error(message, { id: toastId });
     } finally {
       dispatch(setLoading(false));
     }
@@ -134,7 +258,7 @@ const Register = () => {
     if (user) {
       navigate("/");
     }
-  }, []);
+  }, [user, navigate]);
   return (
     <div className="qh-page">
       <Navbar></Navbar>
@@ -154,17 +278,42 @@ const Register = () => {
               name="fullname"
               onChange={changeEventHandler}
               placeholder="John Doe"
+              className={errors.fullname ? "border-red-500 focus-visible:ring-red-200" : ""}
             ></Input>
+            {errors.fullname && <p className="text-xs text-red-600 mt-1">{errors.fullname}</p>}
           </div>
           <div className="my-3">
             <Label>Email</Label>
-            <Input
-              type="email"
-              value={input.email}
-              name="email"
-              onChange={changeEventHandler}
-              placeholder="johndoe@gmail.com"
-            ></Input>
+            <div className="flex gap-2">
+              <Input
+                type="email"
+                value={input.email}
+                name="email"
+                onChange={changeEventHandler}
+                placeholder="johndoe@gmail.com"
+                className={errors.email ? "border-red-500 focus-visible:ring-red-200" : ""}
+              ></Input>
+              <Button type="button" variant="outline" onClick={sendOtpHandler} disabled={otpSending}>
+                {otpSending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send OTP"}
+              </Button>
+            </div>
+            {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email}</p>}
+            {otpSent && !emailOtpVerified && (
+              <div className="mt-2 flex gap-2">
+                <Input
+                  type="text"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value)}
+                  placeholder="Enter 6-digit OTP"
+                  maxLength={6}
+                />
+                <Button type="button" onClick={verifyOtpHandler} disabled={otpVerifying}>
+                  {otpVerifying ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+                </Button>
+              </div>
+            )}
+            {emailOtpVerified && <p className="text-xs text-emerald-600 mt-1">Email verified</p>}
+            {errors.emailOtp && <p className="text-xs text-red-600 mt-1">{errors.emailOtp}</p>}
           </div>
           <div className="my-3">
             <Label>Password</Label>
@@ -174,7 +323,9 @@ const Register = () => {
               name="password"
               onChange={changeEventHandler}
               placeholder="********"
+              className={errors.password ? "border-red-500 focus-visible:ring-red-200" : ""}
             ></Input>
+            {errors.password && <p className="text-xs text-red-600 mt-1">{errors.password}</p>}
           </div>
           <div>
             <Label>PAN Card Number (Optional)</Label>
@@ -203,10 +354,12 @@ const Register = () => {
               value={input.phoneNumber}
               name="phoneNumber"
               onChange={changeEventHandler}
-              placeholder="+1234567890"
+              placeholder="+919876543210"
+              className={errors.phoneNumber ? "border-red-500 focus-visible:ring-red-200" : ""}
             ></Input>
+            {errors.phoneNumber && <p className="text-xs text-red-600 mt-1">{errors.phoneNumber}</p>}
           </div>
-          <div className="flex items-center justify-between qh-panel p-3">
+          <div className={`flex items-center justify-between qh-panel p-3 ${errors.role ? "border border-red-400" : ""}`}>
             <RadioGroup className="flex items-center gap-4 my-5 ">
               <div className="flex items-center space-x-2">
                 <Input
@@ -232,8 +385,9 @@ const Register = () => {
               </div>
             </RadioGroup>
           </div>
+          {errors.role && <p className="text-xs text-red-600 mt-1">{errors.role}</p>}
           <div className="flex items-center gap-2">
-            <Label>Profile Photo</Label>
+            <Label>Profile Photo (Optional)</Label>
             <Input
               type="file"
               accept="image/*"

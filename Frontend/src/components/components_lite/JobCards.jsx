@@ -12,7 +12,7 @@ const JobCards = ({job}) => {
       className="group p-5 rounded-2xl qh-glass cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_30px_rgba(15,23,42,0.15)]"
     >
       <div>
-        <h1 className="qh-display text-lg font-semibold text-slate-900"> {job.name} </h1>
+        <h1 className="qh-display text-lg font-semibold text-slate-900"> {job?.company?.name || "Company"} </h1>
         <p className="text-sm text-slate-500">India</p>
       </div>
       <div>

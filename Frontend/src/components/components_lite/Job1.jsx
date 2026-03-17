@@ -1,18 +1,68 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../ui/button";
-import { Avatar, AvatarImage } from "../ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Badge } from "../ui/badge";
-import { Bookmark } from "lucide-react";
+import { BookMarked, Bookmark, Loader2 } from "lucide-react";
+import { useDispatch, useSelector } from "react-redux";
+import { JOB_API_ENDPOINT } from "@/utils/data";
+import axios from "axios";
+import { setSavedJobIds } from "@/redux/jobSlice";
+import { toast } from "sonner";
 
 const Job1 = ({ job }) => {
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const savedJobIds = useSelector((store) =>
+    Array.isArray(store?.job?.savedJobIds) ? store.job.savedJobIds : []
+  );
+  const { user } = useSelector((store) => store.auth);
+  const [saving, setSaving] = React.useState(false);
+  const isSaved = savedJobIds.includes(String(job?._id || ""));
+
+  const companyInitials = String(job?.company?.name || "C")
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   const daysAgoFunction = (mongodbTime) => {
     const createdAt = new Date(mongodbTime);
     const currentTime = new Date();
     const timeDifference = currentTime - createdAt;
     return Math.floor(timeDifference / (1000 * 24 * 60 * 60));
+  };
+
+  const toggleSaveHandler = async () => {
+    if (!user) {
+      toast.error("Please login to save jobs");
+      navigate("/login");
+      return;
+    }
+
+    if (String(user.role || "") !== "Student") {
+      toast.error("Only students can save jobs");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const res = await axios.post(
+        `${JOB_API_ENDPOINT}/save/${job?._id}`,
+        {},
+        { withCredentials: true }
+      );
+
+      if (res.data?.success) {
+        dispatch(setSavedJobIds(res.data.savedJobIds || []));
+        toast.success(res.data.message || (res.data.isSaved ? "Job saved" : "Job unsaved"));
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Unable to update saved jobs");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -23,8 +73,21 @@ const Job1 = ({ job }) => {
             ? "Today"
             : `${daysAgoFunction(job?.createdAt)} days ago`}
         </p>
-        <Button variant="outline" className="rounded-full" size="icon">
-          <Bookmark />
+        <Button
+          variant="outline"
+          className="rounded-full"
+          size="icon"
+          onClick={toggleSaveHandler}
+          disabled={saving}
+          title={isSaved ? "Remove bookmark" : "Save job"}
+        >
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : isSaved ? (
+            <BookMarked className="h-4 w-4 text-emerald-700" />
+          ) : (
+            <Bookmark className="h-4 w-4" />
+          )}
         </Button>
       </div>
 
@@ -32,6 +95,9 @@ const Job1 = ({ job }) => {
         <Button className="p-6" variant="outline" size="icon">
           <Avatar>
             <AvatarImage src={job?.company?.logo} />
+            <AvatarFallback className="bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100 font-semibold">
+              {companyInitials}
+            </AvatarFallback>
           </Avatar>
         </Button>
         <div>
@@ -62,7 +128,13 @@ const Job1 = ({ job }) => {
         >
           Details
         </Button>
-        <Button className="bg-slate-900 hover:bg-slate-800">Save</Button>
+        <Button
+          className={isSaved ? "bg-emerald-700 hover:bg-emerald-600" : "bg-slate-900 hover:bg-slate-800"}
+          onClick={toggleSaveHandler}
+          disabled={saving}
+        >
+          {saving ? "Saving..." : isSaved ? "Saved" : "Save"}
+        </Button>
       </div>
     </div>
   );

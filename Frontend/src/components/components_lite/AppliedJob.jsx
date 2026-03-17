@@ -35,7 +35,7 @@ const AppliedJob = () => {
               <TableRow key={appliedJob._id}>
                 <TableCell>{appliedJob?.createdAt.split("T")[0]}</TableCell>
                 <TableCell>{appliedJob.job?.title}</TableCell>
-                <TableCell>{appliedJob.job?.company.name}</TableCell>
+                <TableCell>{appliedJob.job?.company?.name || "NA"}</TableCell>
                 <TableCell className="text-right">
                   <Badge
                     className={`${

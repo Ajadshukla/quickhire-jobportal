@@ -4,13 +4,11 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
 import { useSelector } from "react-redux";
-import store from "@/redux/store";
 import {
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
@@ -19,8 +17,6 @@ import { JOB_API_ENDPOINT } from "@/utils/data";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-
-const companyArray = [];
 
 const PostJob = () => {
   const [input, setInput] = useState({
@@ -40,12 +36,18 @@ const PostJob = () => {
     setInput({ ...input, [e.target.name]: e.target.value });
   };
   const [loading, setLoading] = useState(false);
+  const verifiedCompanies = (companies || []).filter(
+    (company) => company.verificationStatus === "verified"
+  );
+  const pendingCompanies = (companies || []).filter(
+    (company) => company.verificationStatus === "pending"
+  );
+  const rejectedCompanies = (companies || []).filter(
+    (company) => company.verificationStatus === "rejected"
+  );
 
   const selectChangeHandler = (value) => {
-    const selectedCompany = companies.find(
-      (company) => company.name.toLowerCase() === value
-    );
-    setInput({ ...input, companyId: selectedCompany._id });
+    setInput({ ...input, companyId: value });
   };
 
   const submitHandler = async (e) => {
@@ -176,17 +178,17 @@ const PostJob = () => {
             </div>
 
             <div>
-              {companies.length > 0 && (
+              {verifiedCompanies.length > 0 && (
                 <Select onValueChange={selectChangeHandler}>
                   <SelectTrigger className="w-full md:w-[260px]">
-                    <SelectValue placeholder="Select a Company" />
+                    <SelectValue placeholder="Select a Verified Company" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      {companies.map((company) => (
+                      {verifiedCompanies.map((company) => (
                         <SelectItem
                           key={company._id}
-                          value={company.name.toLowerCase()}
+                          value={company._id}
                         >
                           {company.name}
                         </SelectItem>
@@ -206,16 +208,27 @@ const PostJob = () => {
             ) : (
               <Button
                 type="submit"
+                disabled={verifiedCompanies.length === 0}
                 className="w-full px-4 py-2 text-sm text-white bg-black rounded-md hover:bg-blue-600"
               >
                 Post Job
               </Button>
             )}
           </div>
-          {companies.length === 0 && (
+          {verifiedCompanies.length === 0 && (
             <p className="text-sm font-bold my-3 text-center text-red-600">
-              *Please register a company to post jobs.*
+              *No verified company available. Owner verification is required before posting jobs.*
             </p>
+          )}
+          {(pendingCompanies.length > 0 || rejectedCompanies.length > 0) && (
+            <div className="mt-2 text-center text-sm text-slate-600">
+              {pendingCompanies.length > 0 && <p>{pendingCompanies.length} company is pending owner review.</p>}
+              {rejectedCompanies.length > 0 && (
+                <p className="text-rose-600">
+                  {rejectedCompanies.length} company is rejected. Update company details to resubmit for review.
+                </p>
+              )}
+            </div>
           )}
         </form>
       </div>

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import Navbar from "./Navbar";
-import { Avatar, AvatarImage } from "../ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
 import { Contact, Download, Eye, Mail, Pen } from "lucide-react";
 import { Badge } from "../ui/badge";
@@ -11,6 +11,13 @@ import useGetAppliedJobs from "@/hooks/useGetAllAppliedJobs";
 import { USER_API_ENDPOINT } from "@/utils/data";
 import axios from "axios";
 import { toast } from "sonner";
+
+const normalizeProfileImageUrl = (url) => {
+  const value = String(url || "").trim();
+  if (!value) return "";
+  if (value.startsWith("http://")) return `https://${value.slice(7)}`;
+  return value;
+};
 
  
 const hasResume = (user) => Boolean(user?.profile?.resume);
@@ -29,6 +36,12 @@ const Profile = () => {
   const [analysis, setAnalysis] = useState(null);
   const { allAppliedJobs } = useSelector((store) => store.job);
   const { user } = useSelector((store) => store.auth);
+  const userInitials = String(user?.fullname || "U")
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   const appliedJobs = useMemo(
     () =>
@@ -87,9 +100,12 @@ const Profile = () => {
           <div className="flex items-center gap-5">
             <Avatar className="cursor-pointer h-24 w-24">
               <AvatarImage
-                src={user?.profile?.profilePhoto}
+                src={normalizeProfileImageUrl(user?.profile?.profilePhoto)}
                 alt="@shadcn"
               />
+              <AvatarFallback className="bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100 font-semibold text-xl">
+                {userInitials}
+              </AvatarFallback>
             </Avatar>
             <div>
               <h1 className=" font-medium text-xl">{user?.fullname}</h1>

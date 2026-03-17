@@ -1,12 +1,17 @@
 import { User } from "../models/user.model.js";
 import { Job } from "../models/job.model.js";
+import { PhoneOtp } from "../models/phoneOtp.model.js";
+import { EmailOtp } from "../models/emailOtp.model.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as pdfParseModule from "pdf-parse";
 import getDataUri from "../utils/datauri.js";
 import cloudinary from "../utils/cloud.js";
+import { generateOTP } from "../utils/otp.js";
+import { sendOTPEmail } from "../utils/sendEmail.js";
 
 const PDFParse = pdfParseModule.PDFParse;
 
@@ -25,6 +30,428 @@ const clearAuthCookieOptions = {
   httpOnly: true,
   sameSite: isProduction ? "none" : "lax",
   secure: isProduction,
+};
+
+const OWNER_EMAIL = String(process.env.OWNER_EMAIL || "").trim().toLowerCase();
+const isOwnerEmail = (email) => {
+  const normalized = String(email || "").trim().toLowerCase();
+  return Boolean(OWNER_EMAIL) && normalized === OWNER_EMAIL;
+};
+
+const resolveRoleByEmail = (requestedRole, email) => {
+  return isOwnerEmail(email) ? "Admin" : requestedRole;
+};
+
+const OTP_PURPOSE_REGISTER = "register";
+const OTP_PURPOSE_UPDATE_PHONE = "update_phone";
+const OTP_PURPOSE_UPDATE_EMAIL = "update_email";
+const SUPPORTED_OTP_PURPOSES = new Set([OTP_PURPOSE_REGISTER, OTP_PURPOSE_UPDATE_PHONE]);
+const SUPPORTED_EMAIL_OTP_PURPOSES = new Set([OTP_PURPOSE_REGISTER, OTP_PURPOSE_UPDATE_EMAIL]);
+const OTP_MAX_ATTEMPTS = 5;
+const OTP_COOLDOWN_SECONDS = 30;
+const OTP_EXPIRY_MINUTES = Math.max(1, Number(process.env.OTP_EXPIRY_MINUTES || 5));
+const OTP_TOKEN_TTL_MINUTES = Math.max(5, Number(process.env.OTP_TOKEN_TTL_MINUTES || 20));
+const OTP_SECRET =
+  String(process.env.OTP_SECRET || process.env.JWT_SECRET || "dev_otp_secret").trim();
+
+const normalizePhoneNumber = (rawPhone) => {
+  const value = String(rawPhone || "").trim().replace(/[\s()-]/g, "");
+  if (!value) return "";
+
+  if (value.startsWith("+")) {
+    return /^\+[1-9]\d{7,14}$/.test(value) ? value : "";
+  }
+
+  const digitsOnly = value.replace(/\D/g, "");
+  if (/^\d{10}$/.test(digitsOnly)) return `+91${digitsOnly}`;
+  if (/^[1-9]\d{7,14}$/.test(digitsOnly)) return `+${digitsOnly}`;
+  return "";
+};
+
+const normalizeEmailAddress = (rawEmail) => String(rawEmail || "").trim().toLowerCase();
+const emailPattern = /^\S+@\S+\.\S+$/;
+
+const hashOtp = (phoneNumber, otp) =>
+  createHash("sha256").update(`${phoneNumber}:${otp}:${OTP_SECRET}`).digest("hex");
+
+const hashVerificationToken = (token) =>
+  createHash("sha256").update(`${token}:${OTP_SECRET}`).digest("hex");
+
+const hashEmailOtp = (email, otp) =>
+  createHash("sha256").update(`${email}:${otp}:${OTP_SECRET}`).digest("hex");
+
+const smtpConfigured = () => {
+  const smtpUser = String(process.env.SMTP_USER || "").trim();
+  const smtpPass = String(process.env.SMTP_PASS || "").trim();
+  const emailUser = String(process.env.EMAIL_USER || "").trim();
+  const emailPass = String(process.env.EMAIL_PASS || "").trim();
+  return Boolean((smtpUser && smtpPass) || (emailUser && emailPass));
+};
+
+const sendEmailOtpMessage = async (email, otpCode) => {
+  if (!smtpConfigured()) {
+    throw new Error("Email provider is not configured");
+  }
+
+  await sendOTPEmail(email, otpCode, OTP_EXPIRY_MINUTES);
+
+  return { provider: "smtp", delivered: true };
+};
+
+const consumeEmailVerificationToken = async (email, verificationToken, purpose) => {
+  if (!verificationToken) {
+    return { ok: false, message: "Email verification token is required" };
+  }
+
+  const record = await EmailOtp.findOne({ email, purpose });
+  if (!record || !record.isVerified || !record.verificationTokenHash) {
+    return { ok: false, message: "Email is not verified. Please verify OTP first." };
+  }
+
+  if (!record.tokenExpiresAt || new Date(record.tokenExpiresAt).getTime() < Date.now()) {
+    await EmailOtp.deleteOne({ _id: record._id });
+    return { ok: false, message: "Email verification expired. Please verify OTP again." };
+  }
+
+  const tokenHash = hashVerificationToken(String(verificationToken));
+  if (tokenHash !== record.verificationTokenHash) {
+    return { ok: false, message: "Invalid email verification token" };
+  }
+
+  await EmailOtp.deleteOne({ _id: record._id });
+  return { ok: true };
+};
+
+export const sendEmailOtp = async (req, res) => {
+  try {
+    const purpose = String(req.body?.purpose || OTP_PURPOSE_REGISTER).trim().toLowerCase();
+    const email = normalizeEmailAddress(req.body?.email);
+
+    if (!SUPPORTED_EMAIL_OTP_PURPOSES.has(purpose)) {
+      return res.status(400).json({ success: false, message: "Unsupported OTP purpose" });
+    }
+
+    if (!email || !emailPattern.test(email)) {
+      return res.status(400).json({ success: false, message: "Enter a valid email address" });
+    }
+
+    const existingUser = await User.findOne({ email }).select("_id");
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: "Email already exists" });
+    }
+
+    const now = Date.now();
+    const existingOtp = await EmailOtp.findOne({ email, purpose });
+    if (existingOtp?.lastSentAt && now - new Date(existingOtp.lastSentAt).getTime() < OTP_COOLDOWN_SECONDS * 1000) {
+      return res.status(429).json({
+        success: false,
+        message: `Please wait ${OTP_COOLDOWN_SECONDS} seconds before requesting another OTP`,
+      });
+    }
+
+    const otpCode = generateOTP();
+    const otpHash = hashEmailOtp(email, otpCode);
+    const expiresAt = new Date(now + OTP_EXPIRY_MINUTES * 60 * 1000);
+    const recordExpiresAt = new Date(now + 24 * 60 * 60 * 1000);
+
+    await EmailOtp.findOneAndUpdate(
+      { email, purpose },
+      {
+        $set: {
+          otpHash,
+          attempts: 0,
+          expiresAt,
+          lastSentAt: new Date(now),
+          isVerified: false,
+          verificationTokenHash: "",
+          tokenExpiresAt: undefined,
+          recordExpiresAt,
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+    await sendEmailOtpMessage(email, otpCode);
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP sent to your email",
+    });
+  } catch (error) {
+    console.error(error);
+    if (String(error?.message || "").includes("Email provider is not configured")) {
+      return res.status(503).json({
+        success: false,
+        message: "Email OTP service is not configured on server. Set SMTP env variables.",
+      });
+    }
+    return res.status(500).json({ success: false, message: "Unable to send OTP right now. Please try again." });
+  }
+};
+
+export const verifyEmailOtp = async (req, res) => {
+  try {
+    const purpose = String(req.body?.purpose || OTP_PURPOSE_REGISTER).trim().toLowerCase();
+    const email = normalizeEmailAddress(req.body?.email);
+    const otp = String(req.body?.otp || "").trim();
+
+    if (!SUPPORTED_EMAIL_OTP_PURPOSES.has(purpose)) {
+      return res.status(400).json({ success: false, message: "Unsupported OTP purpose" });
+    }
+
+    if (!email || !emailPattern.test(email) || !/^\d{6}$/.test(otp)) {
+      return res.status(400).json({ success: false, message: "Invalid email or OTP" });
+    }
+
+    const record = await EmailOtp.findOne({ email, purpose });
+    if (!record) {
+      return res.status(400).json({ success: false, message: "OTP not found. Please request a new OTP." });
+    }
+
+    if (new Date(record.expiresAt).getTime() < Date.now()) {
+      await EmailOtp.deleteOne({ _id: record._id });
+      return res.status(400).json({ success: false, message: "OTP expired. Please request again." });
+    }
+
+    if (record.attempts >= OTP_MAX_ATTEMPTS) {
+      return res.status(429).json({
+        success: false,
+        message: "Too many incorrect attempts. Please request a new OTP.",
+      });
+    }
+
+    const computedHash = hashEmailOtp(email, otp);
+    if (computedHash !== record.otpHash) {
+      record.attempts += 1;
+      await record.save();
+      return res.status(400).json({ success: false, message: "Invalid OTP" });
+    }
+
+    const verificationToken = randomBytes(24).toString("hex");
+    record.isVerified = true;
+    record.verificationTokenHash = hashVerificationToken(verificationToken);
+    record.tokenExpiresAt = new Date(Date.now() + OTP_TOKEN_TTL_MINUTES * 60 * 1000);
+    record.recordExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await record.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Email verified successfully",
+      verificationToken,
+      normalizedEmail: email,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Unable to verify OTP" });
+  }
+};
+
+const twilioConfigured = () => {
+  const sid = String(process.env.TWILIO_ACCOUNT_SID || "").trim();
+  const auth = String(process.env.TWILIO_AUTH_TOKEN || "").trim();
+  const from = String(process.env.TWILIO_FROM_NUMBER || "").trim();
+  return Boolean(sid && auth && from);
+};
+
+const sendOtpMessage = async (phoneNumber, otpCode) => {
+  const message = `Your QuickHire OTP is ${otpCode}. It expires in ${OTP_EXPIRY_MINUTES} minutes.`;
+
+  if (!twilioConfigured()) {
+    throw new Error("SMS provider is not configured");
+  }
+
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const auth = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_FROM_NUMBER;
+  const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`;
+
+  const payload = new URLSearchParams({
+    To: phoneNumber,
+    From: from,
+    Body: message,
+  });
+
+  const authHeader = Buffer.from(`${sid}:${auth}`).toString("base64");
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${authHeader}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: payload,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Twilio send failed: ${errorText}`);
+  }
+
+  return { provider: "twilio", delivered: true };
+};
+
+const consumePhoneVerificationToken = async (phoneNumber, verificationToken, purpose) => {
+  if (!verificationToken) {
+    return { ok: false, message: "Phone verification token is required" };
+  }
+
+  const record = await PhoneOtp.findOne({ phoneNumber, purpose });
+  if (!record || !record.isVerified || !record.verificationTokenHash) {
+    return { ok: false, message: "Phone is not verified. Please verify OTP first." };
+  }
+
+  if (!record.tokenExpiresAt || new Date(record.tokenExpiresAt).getTime() < Date.now()) {
+    await PhoneOtp.deleteOne({ _id: record._id });
+    return { ok: false, message: "Phone verification expired. Please verify OTP again." };
+  }
+
+  const tokenHash = hashVerificationToken(String(verificationToken));
+  if (tokenHash !== record.verificationTokenHash) {
+    return { ok: false, message: "Invalid phone verification token" };
+  }
+
+  await PhoneOtp.deleteOne({ _id: record._id });
+  return { ok: true };
+};
+
+export const sendPhoneOtp = async (req, res) => {
+  try {
+    const purpose = String(req.body?.purpose || OTP_PURPOSE_REGISTER).trim().toLowerCase();
+    const phoneNumber = normalizePhoneNumber(req.body?.phoneNumber);
+
+    if (!SUPPORTED_OTP_PURPOSES.has(purpose)) {
+      return res.status(400).json({ success: false, message: "Unsupported OTP purpose" });
+    }
+
+    if (!phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Enter a valid phone number with country code (for example +919876543210)",
+      });
+    }
+
+    const existingUser = await User.findOne({ phoneNumber }).select("_id");
+    if (existingUser && (purpose === OTP_PURPOSE_REGISTER || purpose === OTP_PURPOSE_UPDATE_PHONE)) {
+      return res.status(400).json({ success: false, message: "Phone number already exists" });
+    }
+
+    const now = Date.now();
+    const existingOtp = await PhoneOtp.findOne({ phoneNumber, purpose });
+    if (existingOtp?.lastSentAt && now - new Date(existingOtp.lastSentAt).getTime() < OTP_COOLDOWN_SECONDS * 1000) {
+      return res.status(429).json({
+        success: false,
+        message: `Please wait ${OTP_COOLDOWN_SECONDS} seconds before requesting another OTP`,
+      });
+    }
+
+    const otpCode = generateOTP();
+    const otpHash = hashOtp(phoneNumber, otpCode);
+    const expiresAt = new Date(now + OTP_EXPIRY_MINUTES * 60 * 1000);
+    const recordExpiresAt = new Date(now + 24 * 60 * 60 * 1000);
+
+    await PhoneOtp.findOneAndUpdate(
+      { phoneNumber, purpose },
+      {
+        $set: {
+          otpHash,
+          attempts: 0,
+          expiresAt,
+          lastSentAt: new Date(now),
+          isVerified: false,
+          verificationTokenHash: "",
+          tokenExpiresAt: undefined,
+          recordExpiresAt,
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+    await sendOtpMessage(phoneNumber, otpCode);
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP sent to your mobile number",
+    });
+  } catch (error) {
+    console.error(error);
+    if (String(error?.message || "").includes("SMS provider is not configured")) {
+      return res.status(503).json({
+        success: false,
+        message: "SMS OTP service is not configured on server. Set Twilio env variables.",
+      });
+    }
+    return res.status(500).json({
+      success: false,
+      message: "Unable to send OTP right now. Please try again.",
+    });
+  }
+};
+
+export const verifyPhoneOtp = async (req, res) => {
+  try {
+    const purpose = String(req.body?.purpose || OTP_PURPOSE_REGISTER).trim().toLowerCase();
+    const phoneNumber = normalizePhoneNumber(req.body?.phoneNumber);
+    const otp = String(req.body?.otp || "").trim();
+
+    if (!SUPPORTED_OTP_PURPOSES.has(purpose)) {
+      return res.status(400).json({ success: false, message: "Unsupported OTP purpose" });
+    }
+
+    if (!phoneNumber || !/^\d{6}$/.test(otp)) {
+      return res.status(400).json({ success: false, message: "Invalid phone number or OTP" });
+    }
+
+    const record = await PhoneOtp.findOne({ phoneNumber, purpose });
+    if (!record) {
+      return res.status(400).json({ success: false, message: "OTP not found. Please request a new OTP." });
+    }
+
+    if (new Date(record.expiresAt).getTime() < Date.now()) {
+      await PhoneOtp.deleteOne({ _id: record._id });
+      return res.status(400).json({ success: false, message: "OTP expired. Please request again." });
+    }
+
+    if (record.attempts >= OTP_MAX_ATTEMPTS) {
+      return res.status(429).json({
+        success: false,
+        message: "Too many incorrect attempts. Please request a new OTP.",
+      });
+    }
+
+    const computedHash = hashOtp(phoneNumber, otp);
+    if (computedHash !== record.otpHash) {
+      record.attempts += 1;
+      await record.save();
+      return res.status(400).json({ success: false, message: "Invalid OTP" });
+    }
+
+    const verificationToken = randomBytes(24).toString("hex");
+    record.isVerified = true;
+    record.verificationTokenHash = hashVerificationToken(verificationToken);
+    record.tokenExpiresAt = new Date(Date.now() + OTP_TOKEN_TTL_MINUTES * 60 * 1000);
+    record.recordExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await record.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Mobile number verified successfully",
+      verificationToken,
+      normalizedPhoneNumber: phoneNumber,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Unable to verify OTP" });
+  }
+};
+
+const uploadProfilePhoto = async (dataUri) => {
+  return cloudinary.uploader.upload(dataUri, {
+    resource_type: "image",
+    folder: "profile_photos",
+    transformation: [
+      { width: 320, height: 320, crop: "fill", gravity: "face" },
+      { quality: "auto", fetch_format: "auto" },
+    ],
+  });
 };
 
 const isCloudinaryConfigured = () => {
@@ -496,28 +923,48 @@ No markdown, no code fences, JSON only.`;
 
 export const register = async (req, res) => {
   try {
-    const { fullname, email, phoneNumber, password, adharcard, pancard, role } = req.body;
+    const { fullname, email, phoneNumber, password, adharcard, pancard, role, emailVerificationToken } = req.body;
     const normalizedEmail = email?.trim().toLowerCase();
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
 
     const normalizedPan = pancard?.trim() || undefined;
     const normalizedAdhar = adharcard?.trim() || undefined;
+    const assignedRole = resolveRoleByEmail(role, normalizedEmail);
 
-    if (!fullname || !normalizedEmail || !phoneNumber || !password || !role) {
+    if (!fullname || !normalizedEmail || !password || !role || !emailVerificationToken) {
       return res.status(400).json({
-        message: "Missing required fields",
+        message: "Missing required fields or email verification",
+        success: false,
+      });
+    }
+
+    if (!String(phoneNumber || "").trim()) {
+      return res.status(400).json({
+        message: "Phone number is required",
+        success: false,
+      });
+    }
+
+    if (!normalizedPhone) {
+      return res.status(400).json({
+        message: "Enter a valid phone number with country code (for example +919876543210)",
         success: false,
       });
     }
 
     const user = await User.findOne({ email: normalizedEmail });
     if (user) {
+      const provider = String(user.authProvider || "local").toLowerCase();
+      const alreadyWithGoogle = provider === "google" || Boolean(user.googleId);
       return res.status(400).json({
-        message: "Email already exists",
+        message: alreadyWithGoogle
+          ? "This email is already registered with Google. Please use Continue with Google on Login."
+          : "Email already exists. Please login instead.",
         success: false,
       });
     }
 
-    const existingPhone = await User.findOne({ phoneNumber });
+    const existingPhone = await User.findOne({ phoneNumber: normalizedPhone });
     if (existingPhone) {
       return res.status(400).json({
         message: "Phone number already exists",
@@ -550,20 +997,29 @@ export const register = async (req, res) => {
 
     if (file && isCloudinaryConfigured()) {
       const fileUri = getDataUri(file);
-      const cloudResponse = await cloudinary.uploader.upload(fileUri.content);
+      const cloudResponse = await uploadProfilePhoto(fileUri.content);
       profilePhoto = cloudResponse.secure_url;
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    const emailVerification = await consumeEmailVerificationToken(
+      normalizedEmail,
+      String(emailVerificationToken || ""),
+      OTP_PURPOSE_REGISTER
+    );
+    if (!emailVerification.ok) {
+      return res.status(400).json({ success: false, message: emailVerification.message });
+    }
+
     const newUser = new User({
       fullname,
       email: normalizedEmail,
-      phoneNumber,
+      phoneNumber: normalizedPhone,
       adharcard: normalizedAdhar,
       pancard: normalizedPan,
       password: hashedPassword,
-      role,
+      role: assignedRole,
       authProvider: "local",
       profile: {
         profilePhoto,
@@ -601,7 +1057,7 @@ export const register = async (req, res) => {
 
 export const googleAuth = async (req, res) => {
   try {
-    const { credential, role } = req.body;
+    const { credential, role, phoneNumber } = req.body;
 
     if (!credential || !role) {
       return res.status(400).json({
@@ -630,37 +1086,104 @@ export const googleAuth = async (req, res) => {
       });
     }
 
+    const googlePicture = String(payload.picture || "").trim().replace(/^http:\/\//i, "https://");
+
     const normalizedGoogleEmail = payload.email.trim().toLowerCase();
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (!String(phoneNumber || "").trim() || !normalizedPhone) {
+      return res.status(400).json({
+        message: "Valid phone number is required for signup",
+        success: false,
+      });
+    }
+
+    const assignedRole = resolveRoleByEmail(role, normalizedGoogleEmail);
     let user = await User.findOne({ email: normalizedGoogleEmail });
     let createdNewUser = false;
 
     if (!user) {
-      const randomPassword = crypto.randomUUID();
+      const existingPhone = await User.findOne({ phoneNumber: normalizedPhone }).select("_id");
+      if (existingPhone) {
+        return res.status(400).json({
+          message: "Phone number already exists",
+          success: false,
+        });
+      }
+
+      const randomPassword = randomUUID();
       const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
       user = await User.create({
         fullname: payload.name || payload.email.split("@")[0],
         email: normalizedGoogleEmail,
+        phoneNumber: normalizedPhone || undefined,
         password: hashedPassword,
-        role,
+        role: assignedRole,
         authProvider: "google",
         googleId: payload.sub,
         profile: {
-          profilePhoto: payload.picture || "",
+          profilePhoto: googlePicture,
         },
       });
       createdNewUser = true;
-    } else if (user.role !== role) {
+    } else if (user.isBlocked) {
+      return res.status(403).json({
+        message: "Your account is blocked by admin",
+        success: false,
+      });
+    } else if (user.role !== role && user.role !== "Admin") {
       return res.status(403).json({
         message: `This account is registered as ${user.role}. Please select that role.`,
         success: false,
       });
-    } else if (!user.authProvider) {
-      user.authProvider = "google";
-      if (!user.googleId) user.googleId = payload.sub;
-      await user.save();
-    }
+    } else {
+      let shouldSave = false;
 
+      if (!user.phoneNumber) {
+        const existingPhone = await User.findOne({
+          phoneNumber: normalizedPhone,
+          _id: { $ne: user._id },
+        }).select("_id");
+        if (existingPhone) {
+          return res.status(400).json({
+            message: "Phone number already exists",
+            success: false,
+          });
+        }
+
+        user.phoneNumber = normalizedPhone;
+        shouldSave = true;
+      }
+
+      if (!user.googleId && payload.sub) {
+        user.googleId = payload.sub;
+        shouldSave = true;
+      }
+
+      if (googlePicture && user.profile?.profilePhoto !== googlePicture) {
+        user.profile.profilePhoto = googlePicture;
+        shouldSave = true;
+      }
+
+      if (!user.fullname && payload.name) {
+        user.fullname = payload.name;
+        shouldSave = true;
+      }
+
+      if (!user.authProvider) {
+        user.authProvider = "google";
+        shouldSave = true;
+      }
+
+      if (isOwnerEmail(normalizedGoogleEmail) && user.role !== "Admin") {
+        user.role = "Admin";
+        shouldSave = true;
+      }
+
+      if (shouldSave) {
+        await user.save();
+      }
+    }
     const tokenData = {
       userId: user._id,
     };
@@ -725,6 +1248,13 @@ export const login = async (req, res) => {
       });
     }
 
+    if (user.isBlocked) {
+      return res.status(403).json({
+        message: "Your account is blocked by admin",
+        success: false,
+      });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({
@@ -733,7 +1263,12 @@ export const login = async (req, res) => {
       });
     }
 
-    if (user.role !== role) {
+    if (isOwnerEmail(normalizedEmail) && user.role !== "Admin") {
+      user.role = "Admin";
+      await user.save();
+    }
+
+    if (user.role !== role && user.role !== "Admin") {
       return res.status(403).json({
         message: "You don't have the necessary role to access this resource",
         success: false,
@@ -830,7 +1365,7 @@ export const getCurrentUser = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { fullname, email, phoneNumber, bio, skills } = req.body;
+    const { fullname, email, phoneNumber, bio, skills, emailVerificationToken } = req.body;
     const file = req.file;
 
     const userId = req.id; // Assuming authentication middleware sets req.id
@@ -844,10 +1379,68 @@ export const updateProfile = async (req, res) => {
     }
 
     if (fullname) user.fullname = fullname;
-    if (email) user.email = email;
-    if (phoneNumber) user.phoneNumber = phoneNumber;
+
+    const normalizedIncomingEmail = normalizeEmailAddress(email);
+    const currentEmail = normalizeEmailAddress(user.email);
+    const hasEmailChanged = Boolean(normalizedIncomingEmail) && normalizedIncomingEmail !== currentEmail;
+
+    if (hasEmailChanged) {
+      if (!emailPattern.test(normalizedIncomingEmail)) {
+        return res.status(400).json({
+          message: "Enter a valid email address",
+          success: false,
+        });
+      }
+
+      const existingEmailUser = await User.findOne({ email: normalizedIncomingEmail }).select("_id");
+      if (existingEmailUser && String(existingEmailUser._id) !== String(user._id)) {
+        return res.status(400).json({
+          message: "Email already exists",
+          success: false,
+        });
+      }
+
+      const emailVerification = await consumeEmailVerificationToken(
+        normalizedIncomingEmail,
+        String(emailVerificationToken || ""),
+        OTP_PURPOSE_UPDATE_EMAIL
+      );
+
+      if (!emailVerification.ok) {
+        return res.status(400).json({
+          message: emailVerification.message,
+          success: false,
+        });
+      }
+
+      user.email = normalizedIncomingEmail;
+    }
+
+    if (phoneNumber) {
+      const normalizedPhone = normalizePhoneNumber(phoneNumber);
+      if (!normalizedPhone) {
+        return res.status(400).json({
+          message: "Enter a valid phone number with country code",
+          success: false,
+        });
+      }
+
+      const hasPhoneChanged = String(normalizedPhone) !== String(user.phoneNumber || "");
+      if (hasPhoneChanged) {
+        const existingPhone = await User.findOne({ phoneNumber: normalizedPhone }).select("_id");
+        if (existingPhone && String(existingPhone._id) !== String(user._id)) {
+          return res.status(400).json({
+            message: "Phone number already exists",
+            success: false,
+          });
+        }
+      }
+
+      user.phoneNumber = normalizedPhone;
+    }
+
     if (bio) user.profile.bio = bio;
-    if (skills) user.profile.skills = skills.split(",");
+    if (skills) user.profile.skills = String(skills).split(",");
 
     if (file && !isCloudinaryConfigured()) {
       return res.status(400).json({
@@ -861,10 +1454,7 @@ export const updateProfile = async (req, res) => {
       const isImageFile = file.mimetype?.startsWith("image/");
 
       if (isImageFile) {
-        const cloudResponse = await cloudinary.uploader.upload(fileUri.content, {
-          resource_type: "image",
-          folder: "profile_photos",
-        });
+        const cloudResponse = await uploadProfilePhoto(fileUri.content);
         user.profile.profilePhoto = cloudResponse.secure_url;
       } else {
         const baseName = file.originalname.replace(/\.[^/.]+$/, "");
