@@ -22,9 +22,29 @@ const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const allowVercelPreviews = String(process.env.ALLOW_VERCEL_PREVIEWS || "false").trim() === "true";
+
+const normalizeOrigin = (value) => String(value || "").trim().replace(/\/$/, "").toLowerCase();
+
+const isOriginAllowed = (origin) => {
+  const normalizedOrigin = normalizeOrigin(origin);
+  if (!normalizedOrigin) return true;
+
+  const normalizedAllowList = allowedOrigins.map(normalizeOrigin);
+  if (normalizedAllowList.includes(normalizedOrigin)) {
+    return true;
+  }
+
+  if (allowVercelPreviews && /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(normalizedOrigin)) {
+    return true;
+  }
+
+  return false;
+};
+
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (isOriginAllowed(origin)) {
       return callback(null, true);
     }
 
