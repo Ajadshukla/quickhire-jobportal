@@ -9,8 +9,10 @@ import { JOB_API_ENDPOINT } from "@/utils/data";
 import { setSavedJobIds } from "@/redux/jobSlice";
 import { useDispatch } from "react-redux";
 import { Button } from "../ui/button";
+import useGetAllJobs from "@/hooks/useGetAllJobs";
 
 const Jobs = () => {
+  useGetAllJobs();
   const { allJobs, searchedQuery, savedJobIds, selectedFilters } = useSelector((store) => store.job);
   const { user } = useSelector((store) => store.auth);
   const dispatch = useDispatch();
@@ -72,16 +74,15 @@ const Jobs = () => {
 
     const filteredJobs = allJobs.filter((job) => {
       const textOk = !textQuery || (() => {
-      const query = searchedQuery.toLowerCase();
       const salaryText = String(job.salary ?? "").toLowerCase();
       const experienceText = String(job.experienceLevel ?? "").toLowerCase();
       return (
-        job.title?.toLowerCase().includes(query) ||
-        job.description?.toLowerCase().includes(query) ||
-        job.location?.toLowerCase().includes(query) ||
-        (Array.isArray(job.requirements) && job.requirements.join(" ").toLowerCase().includes(query)) ||
-        experienceText.includes(query) ||
-        salaryText.includes(query)
+        String(job.title || "").toLowerCase().includes(textQuery) ||
+        String(job.description || "").toLowerCase().includes(textQuery) ||
+        String(job.location || "").toLowerCase().includes(textQuery) ||
+        (Array.isArray(job.requirements) && job.requirements.join(" ").toLowerCase().includes(textQuery)) ||
+        experienceText.includes(textQuery) ||
+        salaryText.includes(textQuery)
       );
       })();
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { setSelectedFilters } from "@/redux/jobSlice";
 import { Button } from "../ui/button";
 
@@ -45,6 +45,7 @@ const filterData = [
 ];
 
 const Filter = () => {
+  const reduxSelectedFilters = useSelector((store) => store.job.selectedFilters);
   const [selectedFilters, setLocalSelectedFilters] = useState({
     location: "",
     technology: "",
@@ -56,7 +57,7 @@ const Filter = () => {
     const key = String(filterType || "").toLowerCase();
     setLocalSelectedFilters((prev) => ({
       ...prev,
-      [key]: value,
+      [key]: prev[key] === value ? "" : value,
     }));
   };
 
@@ -70,6 +71,16 @@ const Filter = () => {
   };
 
   const dispatch = useDispatch();
+
+  useEffect(() => {
+    if (!reduxSelectedFilters) return;
+    setLocalSelectedFilters({
+      location: reduxSelectedFilters.location || "",
+      technology: reduxSelectedFilters.technology || "",
+      experience: reduxSelectedFilters.experience || "",
+      salary: reduxSelectedFilters.salary || "",
+    });
+  }, [reduxSelectedFilters]);
 
   useEffect(() => {
     dispatch(setSelectedFilters(selectedFilters));
