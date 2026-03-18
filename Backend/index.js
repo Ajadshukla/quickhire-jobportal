@@ -35,9 +35,12 @@ const isOriginAllowed = (origin) => {
     return true;
   }
 
-  if (allowVercelPreviews && /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(normalizedOrigin)) {
-    return true;
-  }
+  if (
+  allowVercelPreviews &&
+  normalizedOrigin.includes(".vercel.app")
+) {
+  return true;
+}
 
   return false;
 };
