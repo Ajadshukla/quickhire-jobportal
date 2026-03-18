@@ -10,6 +10,7 @@ import axios from "axios"; // Import axios
 import { setUser } from "@/redux/authSlice";
 import { USER_API_ENDPOINT } from "@/utils/data";
 import { persistor } from "@/redux/store";
+import AnnouncementStrip from "./AnnouncementStrip";
 
 const normalizeProfileImageUrl = (url) => {
   const value = String(url || "").trim();
@@ -52,7 +53,10 @@ const Navbar = () => {
 
   const navItems =
     user && user.role === "Admin"
-      ? [{ label: "Owner", to: "/owner/dashboard" }]
+      ? [
+          { label: "Owner", to: "/owner/dashboard" },
+          { label: "Announcements", to: "/owner/announcements" },
+        ]
       : user && user.role === "Recruiter"
       ? [
           { label: "Companies", to: "/admin/companies" },
@@ -64,6 +68,7 @@ const Navbar = () => {
           { label: "Jobs", to: "/Jobs" },
           ...(user && user.role === "Student"
             ? [
+                { label: "Announcements", to: "/announcements" },
                 { label: "Preparation", to: "/Preparation" },
                 { label: "Resume Analyzer", to: "/resume-analyzer" },
               ]
@@ -270,6 +275,7 @@ const Navbar = () => {
           </div>
         )}
       </div>
+      <AnnouncementStrip />
     </div>
   );
 };

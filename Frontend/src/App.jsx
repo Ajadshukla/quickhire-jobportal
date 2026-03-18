@@ -10,6 +10,7 @@ import Browse from "./components/components_lite/Browse.jsx";
 import Profile from "./components/components_lite/Profile.jsx";
 import ResumeAnalyzer from "./components/components_lite/ResumeAnalyzer.jsx";
 import Preparation from "./components/components_lite/Preparation.jsx";
+import StudentAnnouncements from "./components/components_lite/StudentAnnouncements.jsx";
 import Description from "./components/components_lite/Description.jsx";
 import Companies from "./components/admincomponent/Companies";
 import CompanyCreate from "./components/admincomponent/CompanyCreate";
@@ -18,6 +19,7 @@ import AdminJobs from "./components/admincomponent/AdminJobs.jsx";
 import PostJob from "./components/admincomponent/PostJob";
 import Applicants from "./components/admincomponent/Applicants";
 import OwnerDashboard from "./components/admincomponent/OwnerDashboard";
+import OwnerAnnouncements from "./components/admincomponent/OwnerAnnouncements";
 import ProtectedRoute from "./components/admincomponent/ProtectedRoute";
 import AuthProtectedRoute from "./components/admincomponent/AuthProtectedRoute";
 import axios from "axios";
@@ -60,6 +62,14 @@ const appRouter = createBrowserRouter([
     element: (
       <AuthProtectedRoute requiredRole="Student">
         <ResumeAnalyzer />
+      </AuthProtectedRoute>
+    ),
+  },
+  {
+    path: "/announcements",
+    element: (
+      <AuthProtectedRoute requiredRole="Student">
+        <StudentAnnouncements />
       </AuthProtectedRoute>
     ),
   },
@@ -144,6 +154,14 @@ const appRouter = createBrowserRouter([
     element: (
       <AuthProtectedRoute requiredRole="Admin">
         <OwnerDashboard />
+      </AuthProtectedRoute>
+    ),
+  },
+  {
+    path: "/owner/announcements",
+    element: (
+      <AuthProtectedRoute requiredRole="Admin">
+        <OwnerAnnouncements />
       </AuthProtectedRoute>
     ),
   },

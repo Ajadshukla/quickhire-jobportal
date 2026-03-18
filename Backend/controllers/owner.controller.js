@@ -2,6 +2,7 @@ import { User } from "../models/user.model.js";
 import { Company } from "../models/company.model.js";
 import { Job } from "../models/job.model.js";
 import { Application } from "../models/application.model.js";
+import { Announcement } from "../models/announcement.model.js";
 
 const ensureOwner = (req, res) => {
   if (String(req.userRole || "") !== "Admin") {
@@ -222,5 +223,164 @@ export const updateCompanyVerification = async (req, res) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ success: false, message: "Server Error updating company verification" });
+  }
+};
+
+const normalizeAudience = (value) => {
+  const v = String(value || "").trim().toLowerCase();
+  if (["student", "students", "all", "everyone", "both"].includes(v)) return "Student";
+  return "";
+};
+
+const normalizePriority = (value) => {
+  const v = String(value || "").trim().toLowerCase();
+  const map = {
+    normal: "normal",
+    important: "important",
+    critical: "critical",
+  };
+  return map[v] || "normal";
+};
+
+export const getOwnerAnnouncements = async (req, res) => {
+  try {
+    if (!ensureOwner(req, res)) return;
+
+    const announcements = await Announcement.find({})
+      .populate("createdBy", "fullname email")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({ success: true, announcements });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Server Error loading announcements" });
+  }
+};
+
+export const createAnnouncement = async (req, res) => {
+  try {
+    if (!ensureOwner(req, res)) return;
+
+    const title = String(req.body?.title || "").trim();
+    const message = String(req.body?.message || "").trim();
+    const audience = "Student";
+    const priority = normalizePriority(req.body?.priority);
+    const isActive = req.body?.isActive !== false;
+
+    const publishAt = req.body?.publishAt ? new Date(req.body.publishAt) : new Date();
+    const expireAt = req.body?.expireAt ? new Date(req.body.expireAt) : undefined;
+
+    if (!title || !message || !audience) {
+      return res.status(400).json({
+        success: false,
+        message: "Title and message are required. Announcements are student-only.",
+      });
+    }
+
+    if (Number.isNaN(publishAt.getTime())) {
+      return res.status(400).json({ success: false, message: "Invalid publish date" });
+    }
+
+    if (expireAt && Number.isNaN(expireAt.getTime())) {
+      return res.status(400).json({ success: false, message: "Invalid expiry date" });
+    }
+
+    if (expireAt && expireAt <= publishAt) {
+      return res.status(400).json({
+        success: false,
+        message: "Expiry date must be after publish date",
+      });
+    }
+
+    const announcement = await Announcement.create({
+      title,
+      message,
+      audience,
+      priority,
+      isActive,
+      publishAt,
+      expireAt,
+      createdBy: req.id,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Announcement created successfully",
+      announcement,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Server Error creating announcement" });
+  }
+};
+
+export const updateAnnouncement = async (req, res) => {
+  try {
+    if (!ensureOwner(req, res)) return;
+
+    const announcement = await Announcement.findById(req.params.announcementId);
+    if (!announcement) {
+      return res.status(404).json({ success: false, message: "Announcement not found" });
+    }
+
+    const nextTitle = req.body?.title !== undefined ? String(req.body.title || "").trim() : announcement.title;
+    const nextMessage =
+      req.body?.message !== undefined ? String(req.body.message || "").trim() : announcement.message;
+    const nextAudience = "Student";
+
+    if (!nextTitle || !nextMessage || !nextAudience) {
+      return res.status(400).json({
+        success: false,
+        message: "Title and message are required. Announcements are student-only.",
+      });
+    }
+
+    announcement.title = nextTitle;
+    announcement.message = nextMessage;
+    announcement.audience = nextAudience;
+    announcement.priority =
+      req.body?.priority !== undefined ? normalizePriority(req.body.priority) : announcement.priority;
+
+    if (req.body?.isActive !== undefined) {
+      announcement.isActive = Boolean(req.body.isActive);
+    }
+
+    if (req.body?.publishAt !== undefined) {
+      const publishAt = req.body.publishAt ? new Date(req.body.publishAt) : new Date();
+      if (Number.isNaN(publishAt.getTime())) {
+        return res.status(400).json({ success: false, message: "Invalid publish date" });
+      }
+      announcement.publishAt = publishAt;
+    }
+
+    if (req.body?.expireAt !== undefined) {
+      if (!req.body.expireAt) {
+        announcement.expireAt = undefined;
+      } else {
+        const expireAt = new Date(req.body.expireAt);
+        if (Number.isNaN(expireAt.getTime())) {
+          return res.status(400).json({ success: false, message: "Invalid expiry date" });
+        }
+        announcement.expireAt = expireAt;
+      }
+    }
+
+    if (announcement.expireAt && announcement.expireAt <= announcement.publishAt) {
+      return res.status(400).json({
+        success: false,
+        message: "Expiry date must be after publish date",
+      });
+    }
+
+    await announcement.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Announcement updated successfully",
+      announcement,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Server Error updating announcement" });
   }
 };
