@@ -11,6 +11,7 @@ import { useDispatch } from "react-redux";
 import { Button } from "../ui/button";
 import useGetAllJobs from "@/hooks/useGetAllJobs";
 import useGetAppliedJobs from "@/hooks/useGetAllAppliedJobs";
+import AppliedJob from "./AppliedJob";
 
 const Jobs = () => {
   useGetAllJobs();
@@ -147,11 +148,17 @@ const Jobs = () => {
             >
               Saved Jobs ({normalizedSavedIds.length})
             </Button>
+            <Button
+              variant={viewMode === "applied" ? "default" : "outline"}
+              onClick={() => setViewMode("applied")}
+            >
+              Applied Jobs ({allAppliedJobs?.length || 0})
+            </Button>
           </div>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {viewMode !== "saved" && (
+          {viewMode === "all" && (
             <div className="lg:col-span-3 space-y-4">
               <FilterCard />
 
@@ -206,7 +213,12 @@ const Jobs = () => {
             </div>
           )}
 
-          {visibleJobs.length <= 0 ? (
+          {viewMode === "applied" ? (
+            <div className="lg:col-span-12 qh-panel">
+              <h2 className="qh-display text-lg font-bold mb-2">Applied Jobs</h2>
+              <AppliedJob />
+            </div>
+          ) : visibleJobs.length <= 0 ? (
             <span className={`qh-panel ${viewMode === "saved" ? "lg:col-span-12" : "lg:col-span-9"}`}>
               {viewMode === "saved"
                 ? "No saved jobs yet. Use Save or bookmark button on job cards."
