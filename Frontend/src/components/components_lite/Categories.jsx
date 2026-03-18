@@ -39,15 +39,13 @@ const Categories = () => {
       navigate("/browse");
   }
   return (
-    <div className="max-w-5xl mx-auto px-4 mt-1 md:mt-2">
-      <div className="qh-glass rounded-2xl p-4 md:p-5">
-        <h1 className="qh-display text-2xl md:text-3xl font-black text-center text-slate-900">
-          Categories
-        </h1>
-        <p className="text-center text-sm md:text-base text-slate-600 mt-1.5">
-          Choose a role path.
-        </p>
-      </div>
+    <div className="max-w-7xl mx-auto px-4 md:px-6 mt-4 md:mt-6">
+      <h2 className="qh-display text-4xl md:text-5xl font-black text-slate-900">
+        <span className="text-teal-700">Categories</span>
+      </h2>
+      <p className="text-slate-600 mt-2 max-w-2xl">
+        Choose a role path.
+      </p>
       <Carousel className="w-full max-w-4xl mx-auto my-4 md:my-5 px-8 md:px-10">
         <CarouselContent>
           {Category.map((category, index) => {
