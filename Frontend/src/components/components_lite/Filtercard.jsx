@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { useDispatch, useSelector } from "react-redux";
 import { setSelectedFilters } from "@/redux/jobSlice";
@@ -46,45 +46,35 @@ const filterData = [
 
 const Filter = () => {
   const reduxSelectedFilters = useSelector((store) => store.job.selectedFilters);
-  const [selectedFilters, setLocalSelectedFilters] = useState({
-    location: "",
-    technology: "",
-    experience: "",
-    salary: "",
-  });
-
-  const handleChange = (filterType, value) => {
-    const key = String(filterType || "").toLowerCase();
-    setLocalSelectedFilters((prev) => ({
-      ...prev,
-      [key]: prev[key] === value ? "" : value,
-    }));
-  };
-
-  const clearFilters = () => {
-    setLocalSelectedFilters({
-      location: "",
-      technology: "",
-      experience: "",
-      salary: "",
-    });
+  const selectedFilters = {
+    location: reduxSelectedFilters?.location || "",
+    technology: reduxSelectedFilters?.technology || "",
+    experience: reduxSelectedFilters?.experience || "",
+    salary: reduxSelectedFilters?.salary || "",
   };
 
   const dispatch = useDispatch();
 
-  useEffect(() => {
-    if (!reduxSelectedFilters) return;
-    setLocalSelectedFilters({
-      location: reduxSelectedFilters.location || "",
-      technology: reduxSelectedFilters.technology || "",
-      experience: reduxSelectedFilters.experience || "",
-      salary: reduxSelectedFilters.salary || "",
-    });
-  }, [reduxSelectedFilters]);
+  const handleChange = (filterType, value) => {
+    const key = String(filterType || "").toLowerCase();
+    dispatch(
+      setSelectedFilters({
+        ...selectedFilters,
+        [key]: selectedFilters[key] === value ? "" : value,
+      })
+    );
+  };
 
-  useEffect(() => {
-    dispatch(setSelectedFilters(selectedFilters));
-  }, [dispatch, selectedFilters]);
+  const clearFilters = () => {
+    dispatch(
+      setSelectedFilters({
+        location: "",
+        technology: "",
+        experience: "",
+        salary: "",
+      })
+    );
+  };
 
   return (
     <div className="w-full qh-panel sticky top-24">
