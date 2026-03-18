@@ -1090,18 +1090,19 @@ export const googleAuth = async (req, res) => {
 
     const normalizedGoogleEmail = payload.email.trim().toLowerCase();
     const normalizedPhone = normalizePhoneNumber(phoneNumber);
-    if (!String(phoneNumber || "").trim() || !normalizedPhone) {
-      return res.status(400).json({
-        message: "Valid phone number is required for signup",
-        success: false,
-      });
-    }
 
     const assignedRole = resolveRoleByEmail(role, normalizedGoogleEmail);
     let user = await User.findOne({ email: normalizedGoogleEmail });
     let createdNewUser = false;
 
     if (!user) {
+      if (!String(phoneNumber || "").trim() || !normalizedPhone) {
+        return res.status(400).json({
+          message: "Valid phone number is required for signup",
+          success: false,
+        });
+      }
+
       const existingPhone = await User.findOne({ phoneNumber: normalizedPhone }).select("_id");
       if (existingPhone) {
         return res.status(400).json({
@@ -1116,7 +1117,7 @@ export const googleAuth = async (req, res) => {
       user = await User.create({
         fullname: payload.name || payload.email.split("@")[0],
         email: normalizedGoogleEmail,
-        phoneNumber: normalizedPhone || undefined,
+        phoneNumber: normalizedPhone,
         password: hashedPassword,
         role: assignedRole,
         authProvider: "google",
@@ -1140,6 +1141,13 @@ export const googleAuth = async (req, res) => {
       let shouldSave = false;
 
       if (!user.phoneNumber) {
+        if (!String(phoneNumber || "").trim() || !normalizedPhone) {
+          return res.status(400).json({
+            message: "Valid phone number is required to complete Google sign in",
+            success: false,
+          });
+        }
+
         const existingPhone = await User.findOne({
           phoneNumber: normalizedPhone,
           _id: { $ne: user._id },
