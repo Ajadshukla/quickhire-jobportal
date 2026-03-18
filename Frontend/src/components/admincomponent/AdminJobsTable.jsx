@@ -78,7 +78,7 @@ const AdminJobsTable = () => {
                     </PopoverTrigger>
                     <PopoverContent className="w-32">
                       <div
-                        onClick={() => navigate(`/admin/companies/${job._id}`)}
+                        onClick={() => navigate(`/admin/companies/${job?.company?._id}`)}
                         className="flex items-center gap-2 w-fit cursor-pointer mb-1"
                       >
                         <Edit2 className="w-4" />

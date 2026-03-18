@@ -20,30 +20,35 @@ const Description = () => {
   const { user } = useSelector((store) => store.auth);
 
   const isIntiallyApplied =
-    singleJob?.application?.some(
-      (application) => application.applicant === user?._id
+    singleJob?.applications?.some(
+      (application) => String(application.applicant) === String(user?._id)
     ) || false;
   const [isApplied, setIsApplied] = useState(isIntiallyApplied);
+  const canApply = String(user?.role || "") === "Student";
 
   const applyJobHandler = async () => {
+    if (!canApply) {
+      toast.error("Only students can apply for jobs");
+      return;
+    }
+
     try {
-      const res = await axios.get(
+      const res = await axios.post(
         `${APPLICATION_API_ENDPOINT}/apply/${jobId}`,
+        {},
         { withCredentials: true }
       );
       if (res.data.success) {
         setIsApplied(true);
         const updateSingleJob = {
           ...singleJob,
-          applications: [...singleJob.applications, { applicant: user?._id }],
+          applications: [...(singleJob?.applications || []), { applicant: user?._id }],
         };
         dispatch(setSingleJob(updateSingleJob));
-        console.log(res.data);
         toast.success(res.data.message);
       }
     } catch (error) {
-      console.log(error.message);
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || "Failed to apply for this job");
     }
   };
 
@@ -60,7 +65,7 @@ const Description = () => {
           dispatch(setSingleJob(res.data.job));
           setIsApplied(
             res.data.job.applications.some(
-              (application) => application.applicant === user?._id
+              (application) => String(application.applicant) === String(user?._id)
             )
           );
         } else {
@@ -107,15 +112,15 @@ const Description = () => {
           </div>
           <div>
             <Button
-              onClick={isApplied ? null : applyJobHandler}
-              disabled={isApplied}
+              onClick={isApplied ? undefined : applyJobHandler}
+              disabled={isApplied || !canApply}
               className={`rounded-lg ${
-                isApplied
+                isApplied || !canApply
                   ? "bg-slate-500 cursor-not-allowed"
                   : "bg-slate-900 hover:bg-slate-800"
               }`}
             >
-              {isApplied ? "Already Applied" : "Apply"}
+              {!canApply ? "Students Only" : isApplied ? "Already Applied" : "Apply"}
             </Button>
           </div>
         </div>

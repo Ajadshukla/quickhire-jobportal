@@ -31,9 +31,20 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["Student", "Recruiter"],
+      enum: ["Student", "Recruiter", "Admin"],
       default: "Student",
       required: true,
+    },
+    isBlocked: {
+      type: Boolean,
+      default: false,
+    },
+    blockedAt: {
+      type: Date,
+    },
+    blockedReason: {
+      type: String,
+      default: "",
     },
     authProvider: {
       type: String,
@@ -64,6 +75,12 @@ const userSchema = new mongoose.Schema(
         type: String, // URL to profile photo file
         default: "",
       },
+      savedJobs: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Job",
+        },
+      ],
     },
   },
   { timestamps: true }

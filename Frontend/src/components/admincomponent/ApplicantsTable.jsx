@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Table,
   TableBody,
@@ -11,30 +11,57 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Download, Eye, MoreHorizontal } from "lucide-react";
 import { useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import { toast } from "sonner";
 import axios from "axios";
 import { APPLICATION_API_ENDPOINT } from "@/utils/data";
 import { USER_API_ENDPOINT } from "@/utils/data";
+import { setAllApplicants } from "@/redux/applicationSlice";
 
 const shortlistingStatus = ["Accepted", "Rejected"];
 
 const ApplicantsTable = () => {
   const { applicants } = useSelector((store) => store.application);
+  const dispatch = useDispatch();
+  const [updatingId, setUpdatingId] = useState("");
+
+  const confirmAction = (message) => {
+    if (typeof window === "undefined") return true;
+    return window.confirm(message);
+  };
 
   const statusHandler = async (status, id) => {
-    console.log("called");
+    const normalized = String(status || "").toLowerCase();
+    const currentStatus = (applicants?.applications || []).find((item) => item._id === id)?.status;
+    if (String(currentStatus || "") === normalized) {
+      toast.info(`Already marked as ${normalized}`);
+      return;
+    }
+
+    const proceed = confirmAction(`Mark this applicant as ${normalized}?`);
+    if (!proceed) return;
+
     try {
+      setUpdatingId(id);
       axios.defaults.withCredentials = true;
       const res = await axios.post(
         `${APPLICATION_API_ENDPOINT}/status/${id}/update`,
         { status }
       );
-      console.log(res);
       if (res.data.success) {
         toast.success(res.data.message);
+        const updatedApplicants = {
+          ...applicants,
+          applications: (applicants?.applications || []).map((item) =>
+            item._id === id ? { ...item, status: status.toLowerCase() } : item
+          ),
+        };
+        dispatch(setAllApplicants(updatedApplicants));
       }
     } catch (error) {
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || "Failed to update status");
+    } finally {
+      setUpdatingId("");
     }
   };
 
@@ -49,11 +76,18 @@ const ApplicantsTable = () => {
             <TableHead>Contact</TableHead>
             <TableHead>Resume</TableHead>
             <TableHead>Date</TableHead>
+            <TableHead>Status</TableHead>
             <TableHead className="text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {applicants &&
+          {!applicants?.applications?.length ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center text-slate-500 py-4">
+                No applicants yet for this job.
+              </TableCell>
+            </TableRow>
+          ) : (
             applicants?.applications?.map((item) => (
               <TableRow key={item._id}>
                 <TableCell>{item?.applicant?.fullname}</TableCell>
@@ -86,7 +120,20 @@ const ApplicantsTable = () => {
                     <span>NA</span>
                   )}
                 </TableCell>
-                <TableCell>{item?.applicant?.createdAt.split("T")[0]}</TableCell>
+                <TableCell>{item?.createdAt?.split("T")[0] || "NA"}</TableCell>
+                <TableCell>
+                  <span
+                    className={`inline-flex rounded px-2 py-1 text-xs font-semibold ${
+                      item?.status === "accepted"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : item?.status === "rejected"
+                        ? "bg-rose-100 text-rose-700"
+                        : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    {item?.status || "pending"}
+                  </span>
+                </TableCell>
                 <TableCell className="text-right cursor-pointer">
                   <Popover>
                     <PopoverTrigger asChild>
@@ -100,12 +147,16 @@ const ApplicantsTable = () => {
                             <div
                               onClick={() => statusHandler(status, item?._id)}
                               key={index}
-                              className="flex w-fit items-center my-2 cursor-pointer"
+                              className={`flex w-fit items-center my-2 cursor-pointer ${
+                                updatingId === item?._id ? "opacity-50 pointer-events-none" : ""
+                              }`}
                             >
                               <input
                                 type="radio"
-                                name="shortlistingStatus"
+                                name={`shortlistingStatus-${item?._id}`}
                                 value={status}
+                                checked={String(item?.status || "") === status.toLowerCase()}
+                                readOnly
                                 className="mr-1"
                               />{" "}
                               {status}
@@ -116,7 +167,7 @@ const ApplicantsTable = () => {
                   </Popover>
                 </TableCell>
               </TableRow>
-            ))}
+            )))}
         </TableBody>
       </Table>
     </div>

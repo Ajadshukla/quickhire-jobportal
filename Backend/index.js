@@ -7,6 +7,7 @@ import userRoute from "./routes/user.route.js";
 import companyRoute from "./routes/company.route.js";
 import jobRoute from "./routes/job.route.js";
 import applicationRoute from "./routes/application.route.js";
+import ownerRoute from "./routes/owner.route.js";
 
 dotenv.config({});
 const app = express();
@@ -21,9 +22,32 @@ const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const allowVercelPreviews = String(process.env.ALLOW_VERCEL_PREVIEWS || "false").trim() === "true";
+
+const normalizeOrigin = (value) => String(value || "").trim().replace(/\/$/, "").toLowerCase();
+
+const isOriginAllowed = (origin) => {
+  const normalizedOrigin = normalizeOrigin(origin);
+  if (!normalizedOrigin) return true;
+
+  const normalizedAllowList = allowedOrigins.map(normalizeOrigin);
+  if (normalizedAllowList.includes(normalizedOrigin)) {
+    return true;
+  }
+
+  if (
+  allowVercelPreviews &&
+  normalizedOrigin.includes(".vercel.app")
+) {
+  return true;
+}
+
+  return false;
+};
+
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (isOriginAllowed(origin)) {
       return callback(null, true);
     }
 
@@ -43,8 +67,19 @@ app.use("/api/user", userRoute);
 app.use("/api/company", companyRoute);
 app.use("/api/job", jobRoute);
 app.use("/api/application", applicationRoute);
+app.use("/api/owner", ownerRoute);
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   connectDB();
   console.log(`Server is running on port ${PORT}`);
+});
+
+server.on("error", (error) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(`Port ${PORT} is already in use. Close the existing process or run npm run dev again.`);
+    process.exit(1);
+  }
+
+  console.error("Server failed to start:", error.message);
+  process.exit(1);
 });

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import { Avatar, AvatarImage } from "../ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
 import { LogOut, Moon, Sun, User2 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
@@ -11,11 +11,25 @@ import { setUser } from "@/redux/authSlice";
 import { USER_API_ENDPOINT } from "@/utils/data";
 import { persistor } from "@/redux/store";
 
+const normalizeProfileImageUrl = (url) => {
+  const value = String(url || "").trim();
+  if (!value) return "";
+  if (value.startsWith("http://")) return `https://${value.slice(7)}`;
+  return value;
+};
+
 const Navbar = () => {
   const { user } = useSelector((store) => store.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [theme, setTheme] = useState("light");
+
+  const userInitials = String(user?.fullname || "U")
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -73,7 +87,13 @@ const Navbar = () => {
         </div>
         <div className="flex items-center gap-8">
           <ul className="flex font-semibold items-center gap-5 text-slate-700 dark:text-slate-300 tracking-wide">
-            {user && user.role === "Recruiter" ? (
+            {user && user.role === "Admin" ? (
+              <>
+                <li>
+                  <Link className="hover:text-slate-900 dark:hover:text-white transition-colors" to={"/owner/dashboard"}>Owner</Link>
+                </li>
+              </>
+            ) : user && user.role === "Recruiter" ? (
               <>
                 <li>
                   <Link className="hover:text-slate-900 dark:hover:text-white transition-colors" to={"/admin/companies"}>Companies</Link>
@@ -128,18 +148,24 @@ const Navbar = () => {
               <PopoverTrigger asChild>
                 <Avatar className="cursor-pointer">
                   <AvatarImage
-                    src={user?.profile?.profilePhoto}
+                    src={normalizeProfileImageUrl(user?.profile?.profilePhoto)}
                     alt="@shadcn"
                   />
+                  <AvatarFallback className="bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100 font-semibold">
+                    {userInitials}
+                  </AvatarFallback>
                 </Avatar>
               </PopoverTrigger>
               <PopoverContent className="w-80">
                 <div className="flex items-center gap-4 space-y-2">
                   <Avatar className="cursor-pointer">
                     <AvatarImage
-                      src={user?.profile?.profilePhoto}
+                      src={normalizeProfileImageUrl(user?.profile?.profilePhoto)}
                       alt="@shadcn"
                     />
+                    <AvatarFallback className="bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100 font-semibold">
+                      {userInitials}
+                    </AvatarFallback>
                   </Avatar>
                   <div>
                     <h3 className="font-medium">{user?.fullname}</h3>

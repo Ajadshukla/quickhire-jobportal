@@ -7,6 +7,13 @@ const initialState = {
   searchJobByText: "",
   allAppliedJobs: [], // This will hold
   searchedQuery: "",
+  savedJobIds: [],
+  selectedFilters: {
+    location: "",
+    technology: "",
+    experience: "",
+    salary: "",
+  },
 };
 
 const jobSlice = createSlice({
@@ -31,6 +38,17 @@ const jobSlice = createSlice({
     setSearchedQuery(state, action) {
       state.searchedQuery = action.payload;
     },
+    setSavedJobIds(state, action) {
+      state.savedJobIds = action.payload;
+    },
+    setSelectedFilters(state, action) {
+      state.selectedFilters = {
+        location: action.payload?.location || "",
+        technology: action.payload?.technology || "",
+        experience: action.payload?.experience || "",
+        salary: action.payload?.salary || "",
+      };
+    },
   },
 });
 
@@ -41,5 +59,7 @@ export const {
   setSearchJobByText,
   setAllAppliedJobs,
   setSearchedQuery,
+  setSavedJobIds,
+  setSelectedFilters,
 } = jobSlice.actions;
 export default jobSlice.reducer;

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { useDispatch } from "react-redux";
-import { setSearchedQuery } from "@/redux/jobSlice";
+import { setSelectedFilters } from "@/redux/jobSlice";
+import { Button } from "../ui/button";
 
 const filterData = [
   {
@@ -11,7 +12,7 @@ const filterData = [
       "Mumbai",
       "Kolhapur",
       "Pune",
-      "Bangalore",
+      "Bengaluru",
       "Hyderabad",
       "Chennai",
       "Remote",
@@ -20,17 +21,17 @@ const filterData = [
   {
     filterType: "Technology",
     array: [
-      "Mern",
+      "MERN",
       "React",
       "Data Scientist",
-      "Fullstack",
+      "Full Stack",
       "Node",
       "Python",
       "Java",
-      "frontend",
-      "backend",
-      "mobile",
-      "desktop",
+      "Frontend",
+      "Backend",
+      "Mobile",
+      "Desktop",
     ],
   },
   {
@@ -39,28 +40,58 @@ const filterData = [
   },
   {
     filterType: "Salary",
-    array: ["0-50k", "50k-100k", "100k-200k", "200k+"],
+    array: ["0-10 LPA", "10-15 LPA", "15-20 LPA", "20+ LPA"],
   },
 ];
 
 const Filter = () => {
-  const [selectedValue, setSelectedValue] = useState("");
-  const handleChange = (value) => {
-    setSelectedValue(value);
+  const [selectedFilters, setLocalSelectedFilters] = useState({
+    location: "",
+    technology: "",
+    experience: "",
+    salary: "",
+  });
+
+  const handleChange = (filterType, value) => {
+    const key = String(filterType || "").toLowerCase();
+    setLocalSelectedFilters((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
   };
+
+  const clearFilters = () => {
+    setLocalSelectedFilters({
+      location: "",
+      technology: "",
+      experience: "",
+      salary: "",
+    });
+  };
+
   const dispatch = useDispatch();
+
   useEffect(() => {
-    dispatch(setSearchedQuery(selectedValue));
-  }, [selectedValue]);
+    dispatch(setSelectedFilters(selectedFilters));
+  }, [dispatch, selectedFilters]);
 
   return (
     <div className="w-full qh-panel sticky top-24">
-      <h1 className="qh-display font-bold text-lg">Filter Jobs</h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="qh-display font-bold text-lg">Filter Jobs</h1>
+        <Button variant="outline" size="sm" onClick={clearFilters}>
+          Clear
+        </Button>
+      </div>
       <hr className="mt-3 border-slate-200" />
-      <RadioGroup value={selectedValue} onValueChange={handleChange}>
-        {filterData.map((data, index) => (
+      {filterData.map((data, index) => (
           <div key={index}>
             <h2 className="font-semibold text-slate-800 mt-3">{data.filterType}</h2>
+
+            <RadioGroup
+              value={selectedFilters[String(data.filterType).toLowerCase()]}
+              onValueChange={(value) => handleChange(data.filterType, value)}
+            >
 
             {data.array.map((item, indx) => {
               const itemId = `Id${index}-${indx}`;
@@ -71,9 +102,9 @@ const Filter = () => {
                 </div>
               );
             })}
+            </RadioGroup>
           </div>
         ))}
-      </RadioGroup>
     </div>
   );
 };

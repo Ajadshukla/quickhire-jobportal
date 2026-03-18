@@ -22,6 +22,13 @@ const isCloudinaryConfigured = () => {
 
 export const registerCompany = async (req, res) => {
   try {
+    if (String(req.userRole || "") !== "Recruiter") {
+      return res.status(403).json({
+        message: "Only recruiters can create companies",
+        success: false,
+      });
+    }
+
     const { companyName } = req.body;
     if (!companyName) {
       return res.status(401).json({
@@ -54,7 +61,10 @@ export const registerCompany = async (req, res) => {
 export const getAllCompanies = async (req, res) => {
   try {
     const userId = req.id; // loggedin user id
-    const companies = await Company.find({ userId });
+    const companies =
+      String(req.userRole || "") === "Admin"
+        ? await Company.find({}).sort({ createdAt: -1 })
+        : await Company.find({ userId }).sort({ createdAt: -1 });
     if (!companies) {
       return res.status(404).json({ message: "No companies found" });
     }
@@ -76,6 +86,11 @@ export const getCompanyById = async (req, res) => {
     if (!company) {
       return res.status(404).json({ message: "Company not found" });
     }
+
+    if (String(company.userId) !== String(req.id)) {
+      return res.status(403).json({ message: "Not authorized to view this company", success: false });
+    }
+
     return res.status(200).json({ company, success: true });
   } catch (error) {
     console.error(error);
@@ -88,7 +103,43 @@ export const updateCompany = async (req, res) => {
   try {
     const { name, description, website, location } = req.body;
     const file = req.file;
-    const updateData = { name, description, website, location };
+    const company = await Company.findById(req.params.id);
+    if (!company) {
+      return res.status(404).json({ message: "Company not found", success: false });
+    }
+
+    if (String(company.userId) !== String(req.id)) {
+      return res.status(403).json({ message: "Not authorized to update this company", success: false });
+    }
+
+    const normalizeText = (value) => String(value || "").trim();
+    const normalizedIncoming = {
+      name: normalizeText(name),
+      description: normalizeText(description),
+      website: normalizeText(website),
+      location: normalizeText(location),
+    };
+
+    const normalizedCurrent = {
+      name: normalizeText(company.name),
+      description: normalizeText(company.description),
+      website: normalizeText(company.website),
+      location: normalizeText(company.location),
+    };
+
+    const updateData = {};
+    if (normalizedIncoming.name && normalizedIncoming.name !== normalizedCurrent.name) {
+      updateData.name = normalizedIncoming.name;
+    }
+    if (normalizedIncoming.description !== normalizedCurrent.description) {
+      updateData.description = normalizedIncoming.description;
+    }
+    if (normalizedIncoming.website !== normalizedCurrent.website) {
+      updateData.website = normalizedIncoming.website;
+    }
+    if (normalizedIncoming.location !== normalizedCurrent.location) {
+      updateData.location = normalizedIncoming.location;
+    }
 
     if (file && !isCloudinaryConfigured()) {
       return res.status(400).json({
@@ -103,13 +154,36 @@ export const updateCompany = async (req, res) => {
       updateData.logo = cloudResponse.secure_url;
     }
 
-    const company = await Company.findByIdAndUpdate(req.params.id, updateData, {
+    const hasActualChanges = Object.keys(updateData).length > 0;
+    if (!hasActualChanges) {
+      return res.status(200).json({
+        message: "No changes detected. Company profile is unchanged.",
+        success: true,
+        changed: false,
+        reviewStatus: company.verificationStatus,
+      });
+    }
+
+    const wasRejected = company.verificationStatus === "rejected";
+    if (wasRejected) {
+      updateData.verificationStatus = "pending";
+      updateData.verifiedBy = undefined;
+      updateData.verifiedAt = undefined;
+      updateData.verificationNote = "Resubmitted by recruiter after profile updates";
+    }
+
+    const updatedCompany = await Company.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
     });
-    if (!company) {
-      return res.status(404).json({ message: "Company not found" });
-    }
-    return res.status(200).json({ message: "Company updated", success: true });
+
+    return res.status(200).json({
+      message: wasRejected
+        ? "Company updated and resubmitted for owner review"
+        : "Company updated",
+      success: true,
+      changed: true,
+      reviewStatus: wasRejected ? "pending" : updatedCompany?.verificationStatus || company.verificationStatus,
+    });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Server Error", success: false });

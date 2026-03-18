@@ -16,6 +16,7 @@ import CompanySetup from "./components/admincomponent/CompanySetup";
 import AdminJobs from "./components/admincomponent/AdminJobs.jsx";
 import PostJob from "./components/admincomponent/PostJob";
 import Applicants from "./components/admincomponent/Applicants";
+import OwnerDashboard from "./components/admincomponent/OwnerDashboard";
 import ProtectedRoute from "./components/admincomponent/ProtectedRoute";
 import AuthProtectedRoute from "./components/admincomponent/AuthProtectedRoute";
 import axios from "axios";
@@ -127,6 +128,14 @@ const appRouter = createBrowserRouter([
       <ProtectedRoute>
         <Applicants />
       </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/owner/dashboard",
+    element: (
+      <AuthProtectedRoute requiredRole="Admin">
+        <OwnerDashboard />
+      </AuthProtectedRoute>
     ),
   },
 ]);
