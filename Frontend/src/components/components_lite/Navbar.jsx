@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
-import { LogOut, Moon, Sun, User2 } from "lucide-react";
+import { LogOut, Menu, Moon, Sun, User2, X } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "sonner";
 import axios from "axios"; // Import axios
@@ -23,6 +23,7 @@ const Navbar = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [theme, setTheme] = useState("light");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const userInitials = String(user?.fullname || "U")
     .split(" ")
@@ -46,6 +47,25 @@ const Navbar = () => {
     document.documentElement.classList.toggle("dark", nextTheme === "dark");
     localStorage.setItem("quickhire-theme", nextTheme);
   };
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
+  const navItems =
+    user && user.role === "Admin"
+      ? [{ label: "Owner", to: "/owner/dashboard" }]
+      : user && user.role === "Recruiter"
+      ? [
+          { label: "Companies", to: "/admin/companies" },
+          { label: "Jobs", to: "/admin/jobs" },
+        ]
+      : [
+          { label: "Home", to: "/Home" },
+          { label: "Browse", to: "/Browse" },
+          { label: "Jobs", to: "/Jobs" },
+          ...(user && user.role === "Student"
+            ? [{ label: "Preparation", to: "/Preparation" }]
+            : []),
+        ];
 
   const logoutHandler = async () => {
     try {
@@ -72,93 +92,56 @@ const Navbar = () => {
   };
   return (
     <div className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/85 backdrop-blur-md dark:border-slate-700/70 dark:bg-slate-950/70">
-      <div className="flex items-center justify-between mx-auto max-w-7xl h-20 px-4 md:px-6">
-        <div>
+      <div className="mx-auto max-w-7xl px-4 md:px-6">
+        <div className="flex min-h-20 items-center justify-between py-3 md:h-20 md:py-0">
+          <div className="min-w-0">
           <Link to="/Home" className="inline-block">
-            <h1 className="qh-display text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
+            <h1 className="qh-display text-xl md:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 truncate">
               <span className="text-[#0f766e]">Quick</span>
               <span className="text-[#b45309]">Hire</span>
               <span className="text-slate-900 dark:text-slate-100"> Job Portal</span>
             </h1>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 tracking-[0.2em] uppercase">
+            <p className="hidden sm:block text-[11px] text-slate-500 dark:text-slate-400 tracking-[0.2em] uppercase">
               Student and Recruiter Hub
             </p>
           </Link>
-        </div>
-        <div className="flex items-center gap-8">
-          <ul className="flex font-semibold items-center gap-5 text-slate-700 dark:text-slate-300 tracking-wide">
-            {user && user.role === "Admin" ? (
-              <>
-                <li>
-                  <Link className="hover:text-slate-900 dark:hover:text-white transition-colors" to={"/owner/dashboard"}>Owner</Link>
+          </div>
+          <div className="flex items-center gap-2 md:gap-6">
+            <ul className="hidden md:flex font-semibold items-center gap-5 text-slate-700 dark:text-slate-300 tracking-wide">
+              {navItems.map((item) => (
+                <li key={item.to}>
+                  <Link className="hover:text-slate-900 dark:hover:text-white transition-colors" to={item.to}>
+                    {item.label}
+                  </Link>
                 </li>
-              </>
-            ) : user && user.role === "Recruiter" ? (
-              <>
-                <li>
-                  <Link className="hover:text-slate-900 dark:hover:text-white transition-colors" to={"/admin/companies"}>Companies</Link>
-                </li>
-                <li>
-                  <Link className="hover:text-slate-900 dark:hover:text-white transition-colors" to={"/admin/jobs"}>Jobs</Link>
-                </li>
-              </>
+              ))}
+            </ul>
+
+            <Button
+              onClick={toggleTheme}
+              variant="outline"
+              size="icon"
+              className="border-slate-300 dark:border-slate-700"
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+
+            {!user ? (
+              <div className="hidden md:flex items-center gap-2">
+                <Link to={"/login"}>
+                  <Button variant="outline" className="border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800">Login</Button>
+                </Link>
+                <Link to={"/register"}>
+                  <Button className="bg-slate-900 hover:bg-slate-800 text-white">
+                    Register
+                  </Button>
+                </Link>
+              </div>
             ) : (
-              <>
-                <li>
-                  <Link className="hover:text-slate-900 dark:hover:text-white transition-colors" to={"/Home"}>Home</Link>
-                </li>
-                <li>
-                  <Link className="hover:text-slate-900 dark:hover:text-white transition-colors" to={"/Browse"}>Browse</Link>
-                </li>
-                <li>
-                  <Link className="hover:text-slate-900 dark:hover:text-white transition-colors" to={"/Jobs"}>Jobs</Link>
-                </li>
-                {user && user.role === "Student" && (
-                  <li>
-                    <Link className="hover:text-slate-900 dark:hover:text-white transition-colors" to={"/Preparation"}>Preparation</Link>
-                  </li>
-                )}
-              </>
-            )}
-          </ul>
-
-          <Button
-            onClick={toggleTheme}
-            variant="outline"
-            size="icon"
-            className="border-slate-300 dark:border-slate-700"
-            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
-
-          {!user ? (
-            <div className=" flex items-center gap-2">
-              <Link to={"/login"}>
-                <Button variant="outline" className="border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800">Login</Button>
-              </Link>
-              <Link to={"/register"}>
-                <Button className="bg-slate-900 hover:bg-slate-800 text-white">
-                  Register
-                </Button>
-              </Link>
-            </div>
-          ) : (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Avatar className="cursor-pointer">
-                  <AvatarImage
-                    src={normalizeProfileImageUrl(user?.profile?.profilePhoto)}
-                    alt="@shadcn"
-                  />
-                  <AvatarFallback className="bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100 font-semibold">
-                    {userInitials}
-                  </AvatarFallback>
-                </Avatar>
-              </PopoverTrigger>
-              <PopoverContent className="w-80">
-                <div className="flex items-center gap-4 space-y-2">
-                  <Avatar className="cursor-pointer">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Avatar className="hidden md:flex cursor-pointer">
                     <AvatarImage
                       src={normalizeProfileImageUrl(user?.profile?.profilePhoto)}
                       alt="@shadcn"
@@ -167,36 +150,122 @@ const Navbar = () => {
                       {userInitials}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <h3 className="font-medium">{user?.fullname}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {user?.profile?.bio}
-                    </p>
+                </PopoverTrigger>
+                <PopoverContent className="w-80">
+                  <div className="flex items-center gap-4 space-y-2">
+                    <Avatar className="cursor-pointer">
+                      <AvatarImage
+                        src={normalizeProfileImageUrl(user?.profile?.profilePhoto)}
+                        alt="@shadcn"
+                      />
+                      <AvatarFallback className="bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100 font-semibold">
+                        {userInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="font-medium">{user?.fullname}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {user?.profile?.bio}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex flex-col my-2 text-gray-600 dark:text-slate-300">
-                  {user && user.role === "Student" && (
+                  <div className="flex flex-col my-2 text-gray-600 dark:text-slate-300">
+                    {user && user.role === "Student" && (
+                      <div className="flex w-fit items-center gap-2 cursor-pointer">
+                        <User2></User2>
+                        <Button variant="link">
+                          <Link to={"/Profile"}> Profile</Link>
+                        </Button>
+                      </div>
+                    )}
+
                     <div className="flex w-fit items-center gap-2 cursor-pointer">
-                      <User2></User2>
-                      <Button variant="link">
-                        {" "}
-                        <Link to={"/Profile"}> Profile</Link>{" "}
+                      <LogOut></LogOut>
+                      <Button onClick={logoutHandler} variant="link">
+                        Logout
                       </Button>
                     </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="md:hidden border-slate-300 dark:border-slate-700"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label="Toggle navigation menu"
+            >
+              {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+
+        {mobileMenuOpen && (
+          <div className="md:hidden pb-4 pt-1">
+            <div className="qh-panel p-3 space-y-2">
+              {navItems.map((item) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={closeMobileMenu}
+                  className="block rounded-lg px-3 py-2 font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  {item.label}
+                </Link>
+              ))}
+
+              {!user ? (
+                <div className="grid grid-cols-2 gap-2 pt-2">
+                  <Link to={"/login"} onClick={closeMobileMenu}>
+                    <Button variant="outline" className="w-full border-slate-300 dark:border-slate-700">
+                      Login
+                    </Button>
+                  </Link>
+                  <Link to={"/register"} onClick={closeMobileMenu}>
+                    <Button className="w-full bg-slate-900 hover:bg-slate-800 text-white">Register</Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="pt-2 space-y-2">
+                  <div className="flex items-center gap-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 px-3 py-2">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={normalizeProfileImageUrl(user?.profile?.profilePhoto)} alt="profile" />
+                      <AvatarFallback className="bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-100 font-semibold">
+                        {userInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">
+                      {user?.fullname}
+                    </span>
+                  </div>
+
+                  {user.role === "Student" && (
+                    <Link to={"/Profile"} onClick={closeMobileMenu}>
+                      <Button variant="outline" className="w-full justify-start border-slate-300 dark:border-slate-700">
+                        <User2 className="h-4 w-4 mr-2" /> Profile
+                      </Button>
+                    </Link>
                   )}
 
-                  <div className="flex w-fit items-center gap-2 cursor-pointer">
-                    <LogOut></LogOut>
-                    <Button onClick={logoutHandler} variant="link">
-                      Logout
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={async () => {
+                      closeMobileMenu();
+                      await logoutHandler();
+                    }}
+                    variant="outline"
+                    className="w-full justify-start border-slate-300 dark:border-slate-700"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" /> Logout
+                  </Button>
                 </div>
-              </PopoverContent>
-            </Popover>
-          )}
-        </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

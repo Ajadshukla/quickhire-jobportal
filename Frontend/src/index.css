@@ -122,6 +122,7 @@
     background-size: 18px 18px;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    overflow-x: hidden;
   }
 
   h1,

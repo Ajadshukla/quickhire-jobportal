@@ -160,7 +160,7 @@ const Jobs = () => {
                 : "No jobs found. Ask a recruiter to post jobs from the admin panel."}
             </span>
           ) : (
-            <div className={`${viewMode === "saved" ? "lg:col-span-12" : "lg:col-span-9"} h-[88vh] overflow-y-auto pb-5 pr-1`}>
+            <div className={`${viewMode === "saved" ? "lg:col-span-12" : "lg:col-span-9"} pb-5 lg:pr-1 lg:h-[88vh] lg:overflow-y-auto`}>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {visibleJobs.map((job) => (
                   <motion.div
