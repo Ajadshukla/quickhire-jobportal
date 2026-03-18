@@ -8,6 +8,7 @@ import TermsofService from "./components/components_lite/TermsofService.jsx";
 import Jobs from "./components/components_lite/Jobs.jsx";
 import Browse from "./components/components_lite/Browse.jsx";
 import Profile from "./components/components_lite/Profile.jsx";
+import ResumeAnalyzer from "./components/components_lite/ResumeAnalyzer.jsx";
 import Preparation from "./components/components_lite/Preparation.jsx";
 import Description from "./components/components_lite/Description.jsx";
 import Companies from "./components/admincomponent/Companies";
@@ -51,6 +52,14 @@ const appRouter = createBrowserRouter([
     element: (
       <AuthProtectedRoute requiredRole="Student">
         <Preparation />
+      </AuthProtectedRoute>
+    ),
+  },
+  {
+    path: "/resume-analyzer",
+    element: (
+      <AuthProtectedRoute requiredRole="Student">
+        <ResumeAnalyzer />
       </AuthProtectedRoute>
     ),
   },
