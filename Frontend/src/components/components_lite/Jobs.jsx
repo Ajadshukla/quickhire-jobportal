@@ -10,10 +10,12 @@ import { setSavedJobIds } from "@/redux/jobSlice";
 import { useDispatch } from "react-redux";
 import { Button } from "../ui/button";
 import useGetAllJobs from "@/hooks/useGetAllJobs";
+import useGetAppliedJobs from "@/hooks/useGetAllAppliedJobs";
 
 const Jobs = () => {
   useGetAllJobs();
-  const { allJobs, searchedQuery, savedJobIds, selectedFilters } = useSelector((store) => store.job);
+  useGetAppliedJobs();
+  const { allJobs, allAppliedJobs, searchedQuery, savedJobIds, selectedFilters } = useSelector((store) => store.job);
   const { user } = useSelector((store) => store.auth);
   const dispatch = useDispatch();
   const [filterJobs, setFilterJobs] = useState(allJobs);
@@ -121,6 +123,7 @@ const Jobs = () => {
   }, [dispatch, user?.role]);
 
   const normalizedSavedIds = Array.isArray(savedJobIds) ? savedJobIds : [];
+  const recentAppliedJobs = Array.isArray(allAppliedJobs) ? allAppliedJobs.slice(0, 5) : [];
   const visibleJobs =
     viewMode === "saved"
       ? filterJobs.filter((job) => normalizedSavedIds.includes(String(job?._id || "")))
@@ -149,8 +152,57 @@ const Jobs = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           {viewMode !== "saved" && (
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-3 space-y-4">
               <FilterCard />
+
+              {String(user?.role || "") === "Student" && (
+                <div className="qh-panel">
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="qh-display text-lg font-bold">Applied Jobs</h2>
+                    <span className="text-xs rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-slate-600 dark:text-slate-300">
+                      {allAppliedJobs?.length || 0}
+                    </span>
+                  </div>
+
+                  {recentAppliedJobs.length === 0 ? (
+                    <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                      You have not applied yet.
+                    </p>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      {recentAppliedJobs.map((applied) => (
+                        <div
+                          key={applied._id}
+                          className="rounded-lg border border-slate-200 dark:border-slate-700 p-2.5"
+                        >
+                          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 line-clamp-1">
+                            {applied?.job?.title || "Job"}
+                          </p>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-1">
+                            {applied?.job?.company?.name || "Company"}
+                          </p>
+                          <div className="mt-1 flex items-center justify-between">
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                              {String(applied?.createdAt || "").split("T")[0] || "-"}
+                            </span>
+                            <span
+                              className={`inline-flex rounded px-2 py-0.5 text-[11px] font-semibold ${
+                                applied?.status === "accepted"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : applied?.status === "rejected"
+                                  ? "bg-rose-100 text-rose-700"
+                                  : "bg-slate-100 text-slate-700"
+                              }`}
+                            >
+                              {applied?.status || "pending"}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
