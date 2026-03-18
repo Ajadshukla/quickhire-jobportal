@@ -65,7 +65,7 @@ const Navbar = () => {
           ...(user && user.role === "Student"
             ? [
                 { label: "Preparation", to: "/Preparation" },
-                { label: "Resume Analyzer", to: "/resume-analyzer" },
+                { label: "Analyzer", to: "/resume-analyzer" },
               ]
             : []),
         ];
