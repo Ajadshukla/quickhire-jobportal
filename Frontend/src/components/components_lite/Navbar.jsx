@@ -11,6 +11,7 @@ import { setUser } from "@/redux/authSlice";
 import { USER_API_ENDPOINT } from "@/utils/data";
 import { persistor } from "@/redux/store";
 import AnnouncementStrip from "./AnnouncementStrip";
+import NotificationBell from "./NotificationBell";
 
 const normalizeProfileImageUrl = (url) => {
   const value = String(url || "").trim();
@@ -172,6 +173,8 @@ const Navbar = () => {
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
+
+            {user ? <NotificationBell /> : null}
 
             {!user ? (
               <div className="hidden md:flex items-center gap-2">

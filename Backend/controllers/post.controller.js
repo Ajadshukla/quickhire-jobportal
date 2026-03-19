@@ -1,6 +1,8 @@
 import { Post } from "../models/post.model.js";
+import { User } from "../models/user.model.js";
 import getDataUri from "../utils/datauri.js";
 import cloudinary from "../utils/cloud.js";
+import { createNotification } from "../utils/notification.js";
 
 const isCloudinaryConfigured = () => {
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUD_NAME;
@@ -128,7 +130,7 @@ export const toggleLikePost = async (req, res) => {
   try {
     const { postId } = req.params;
 
-    const post = await Post.findById(postId).select("likes");
+    const post = await Post.findById(postId).select("likes userId");
     if (!post) {
       return res.status(404).json({
         message: "Post not found",
@@ -143,6 +145,17 @@ export const toggleLikePost = async (req, res) => {
       post.likes = post.likes.filter((likedUserId) => String(likedUserId) !== userId);
     } else {
       post.likes.push(req.id);
+
+      if (String(post.userId || "") !== userId) {
+        const actor = await User.findById(req.id).select("fullname");
+        await createNotification({
+          req,
+          userId: post.userId,
+          type: "like",
+          message: `${actor?.fullname || "Someone"} liked your post.`,
+          link: "/feed",
+        });
+      }
     }
 
     await post.save();
@@ -197,6 +210,17 @@ export const addCommentToPost = async (req, res) => {
       text,
       createdAt: new Date(),
     });
+
+    if (String(post.userId || "") !== String(req.id || "")) {
+      const actor = await User.findById(req.id).select("fullname");
+      await createNotification({
+        req,
+        userId: post.userId,
+        type: "comment",
+        message: `${actor?.fullname || "Someone"} commented on your post.`,
+        link: "/feed",
+      });
+    }
 
     await post.save();
 

@@ -1,6 +1,8 @@
 import { Application } from "../models/application.model.js";
 import { Conversation } from "../models/conversation.model.js";
 import { Message } from "../models/message.model.js";
+import { User } from "../models/user.model.js";
+import { createNotification } from "../utils/notification.js";
 
 const normalizeRole = (role) => String(role || "").trim().toLowerCase();
 
@@ -68,6 +70,22 @@ const emitMessageEvent = async (req, conversationId, messageId) => {
   io.to(`conversation:${conversationId}`).emit("message:new", {
     conversationId: String(conversationId),
     message,
+  });
+};
+
+const notifyMessageReceiver = async ({ req, receiverUserId, senderName, text, applicationId }) => {
+  if (!receiverUserId) return;
+  if (String(receiverUserId) === String(req.id)) return;
+
+  const preview = String(text || "").trim().slice(0, 100);
+  const safeSenderName = String(senderName || "Someone").trim();
+
+  await createNotification({
+    req,
+    userId: receiverUserId,
+    type: "message",
+    message: `${safeSenderName}: ${preview}`,
+    link: applicationId ? `/messages?applicationId=${applicationId}` : "/messages",
   });
 };
 
@@ -280,6 +298,13 @@ export const initiateConversation = async (req, res) => {
     await conversation.save();
 
     await emitMessageEvent(req, conversation._id, message._id);
+    await notifyMessageReceiver({
+      req,
+      receiverUserId: access.studentId,
+      senderName: access.application?.job?.created_by?.fullname,
+      text,
+      applicationId: access.application?._id,
+    });
 
     const messages = await Message.find({ conversation: conversation._id })
       .populate({
@@ -366,6 +391,18 @@ export const sendMessage = async (req, res) => {
     await conversation.save();
 
     await emitMessageEvent(req, conversation._id, newMessage._id);
+
+    const sender = await User.findById(req.id).select("fullname");
+    const receiverUserId = isRecruiter ? conversation.student : conversation.recruiter;
+    const applicationId = conversation?.application?._id || conversation?.application;
+
+    await notifyMessageReceiver({
+      req,
+      receiverUserId,
+      senderName: sender?.fullname,
+      text,
+      applicationId,
+    });
 
     const message = await Message.findById(newMessage._id).populate({
       path: "sender",

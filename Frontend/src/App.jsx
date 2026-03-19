@@ -14,6 +14,7 @@ import StudentAnnouncements from "./components/components_lite/StudentAnnounceme
 import Feed from "./components/components_lite/Feed.jsx";
 import Messages from "./components/components_lite/Messages.jsx";
 import Settings from "./components/components_lite/Settings.jsx";
+import Notifications from "./components/components_lite/Notifications.jsx";
 import Description from "./components/components_lite/Description.jsx";
 import QuickInboxDock from "./components/components_lite/QuickInboxDock.jsx";
 import Companies from "./components/admincomponent/Companies";
@@ -94,6 +95,14 @@ const appRouter = createBrowserRouter([
     element: (
       <AuthProtectedRoute>
         <Settings />
+      </AuthProtectedRoute>
+    ),
+  },
+  {
+    path: "/notifications",
+    element: (
+      <AuthProtectedRoute>
+        <Notifications />
       </AuthProtectedRoute>
     ),
   },

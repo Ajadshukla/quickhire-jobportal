@@ -13,6 +13,7 @@ import ownerRoute from "./routes/owner.route.js";
 import announcementRoute from "./routes/announcement.route.js";
 import postRoute from "./routes/post.route.js";
 import messageRoute from "./routes/message.route.js";
+import notificationRoute from "./routes/notification.route.js";
 import { registerRealtimeHandlers } from "./utils/realtime.js";
 
 dotenv.config({});
@@ -77,6 +78,7 @@ app.use("/api/owner", ownerRoute);
 app.use("/api/announcement", announcementRoute);
 app.use("/api/posts", postRoute);
 app.use("/api/messages", messageRoute);
+app.use("/api/notifications", notificationRoute);
 
 const server = createServer(app);
 const io = new SocketIOServer(server, {

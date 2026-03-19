@@ -2,6 +2,7 @@ import { Application } from "../models/application.model.js";
 import { Job } from "../models/job.model.js";
 import { User } from "../models/user.model.js";
 import { Company } from "../models/company.model.js";
+import { createNotification } from "../utils/notification.js";
 
 const cleanupOrphanApplications = async (applicationIds = []) => {
   const ids = Array.from(new Set((applicationIds || []).map((id) => String(id)).filter(Boolean)));
@@ -185,7 +186,7 @@ export const updateStatus = async (req, res) => {
       return res.status(404).json({ message: "User not found", success: false });
     }
 
-    const job = await Job.findById(application.job).select("created_by");
+    const job = await Job.findById(application.job).select("created_by title");
     if (!job) {
       return res.status(404).json({ message: "Job not found", success: false });
     }
@@ -198,6 +199,21 @@ export const updateStatus = async (req, res) => {
     // update the status
     application.status = status.toLowerCase();
     await application.save();
+
+    if (["accepted", "rejected"].includes(application.status)) {
+      const statusText = application.status === "accepted" ? "accepted" : "rejected";
+
+      await createNotification({
+        req,
+        userId: application.applicant,
+        type: "application",
+        message: `Your application for ${job?.title || "a job"} was ${statusText}.`,
+        link:
+          application.status === "accepted"
+            ? `/messages?applicationId=${application._id}`
+            : "/Jobs",
+      });
+    }
 
     return res
       .status(200)
