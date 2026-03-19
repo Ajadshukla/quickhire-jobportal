@@ -1199,16 +1199,7 @@ export const googleAuth = async (req, res) => {
       expiresIn: "1d",
     });
 
-    const sanitizedUser = {
-      _id: user._id,
-      fullname: user.fullname,
-      email: user.email,
-      phoneNumber: user.phoneNumber,
-      adharcard: user.adharcard,
-      pancard: user.pancard,
-      role: user.role,
-      profile: user.profile,
-    };
+    const sanitizedUser = buildSanitizedUser(user);
 
     return res
       .status(200)
@@ -1290,16 +1281,7 @@ export const login = async (req, res) => {
       expiresIn: "1d",
     });
 
-    const sanitizedUser = {
-      _id: user._id,
-      fullname: user.fullname,
-      email: user.email,
-      phoneNumber: user.phoneNumber,
-      adharcard: user.adharcard,
-      pancard: user.pancard,
-      role: user.role,
-      profile: user.profile,
-    };
+    const sanitizedUser = buildSanitizedUser(user);
 
     return res
       .status(200)
@@ -1336,6 +1318,215 @@ export const logout = async (req, res) => {
   }
 };
 
+const DEFAULT_USER_SETTINGS = {
+  notifications: {
+    applicationUpdates: true,
+    messageAlerts: true,
+    announcementAlerts: true,
+    jobRecommendations: true,
+    weeklyDigest: true,
+    marketingEmails: false,
+  },
+  privacy: {
+    profileVisibility: "recruiters",
+    showEmailToRecruiters: false,
+    showPhoneToRecruiters: false,
+    allowRecruiterMessages: true,
+  },
+  preferences: {
+    theme: "system",
+    compactMode: false,
+    autoPlayVideos: true,
+    language: "en",
+    timezone: "Asia/Kolkata",
+  },
+  jobPreferences: {
+    preferredRoles: [],
+    preferredLocations: [],
+    openToRemote: true,
+    minSalaryLPA: 0,
+  },
+  recruiterPreferences: {
+    focusHiringFor: [],
+    preferredWorkRegions: [],
+    autoArchiveRejected: true,
+    candidateResponseSLAHours: 48,
+  },
+  adminPreferences: {
+    strictModerationMode: true,
+    autoHideReportedPosts: true,
+    verificationAlerts: true,
+    ownerDigestFrequency: "weekly",
+  },
+};
+
+const cleanArrayOfStrings = (value, max = 12) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .slice(0, max);
+};
+
+const normalizeUserSettings = (rawSettings = {}) => {
+  const source = rawSettings || {};
+
+  const theme = String(source?.preferences?.theme || "").trim().toLowerCase();
+  const normalizedTheme = ["light", "dark", "system"].includes(theme)
+    ? theme
+    : DEFAULT_USER_SETTINGS.preferences.theme;
+
+  const visibility = String(source?.privacy?.profileVisibility || "").trim().toLowerCase();
+  const normalizedVisibility = ["public", "recruiters", "private"].includes(visibility)
+    ? visibility
+    : DEFAULT_USER_SETTINGS.privacy.profileVisibility;
+
+  const digestFrequency = String(source?.adminPreferences?.ownerDigestFrequency || "")
+    .trim()
+    .toLowerCase();
+  const normalizedDigestFrequency = ["daily", "weekly", "off"].includes(digestFrequency)
+    ? digestFrequency
+    : DEFAULT_USER_SETTINGS.adminPreferences.ownerDigestFrequency;
+
+  return {
+    notifications: {
+      applicationUpdates:
+        typeof source?.notifications?.applicationUpdates === "boolean"
+          ? source.notifications.applicationUpdates
+          : DEFAULT_USER_SETTINGS.notifications.applicationUpdates,
+      messageAlerts:
+        typeof source?.notifications?.messageAlerts === "boolean"
+          ? source.notifications.messageAlerts
+          : DEFAULT_USER_SETTINGS.notifications.messageAlerts,
+      announcementAlerts:
+        typeof source?.notifications?.announcementAlerts === "boolean"
+          ? source.notifications.announcementAlerts
+          : DEFAULT_USER_SETTINGS.notifications.announcementAlerts,
+      jobRecommendations:
+        typeof source?.notifications?.jobRecommendations === "boolean"
+          ? source.notifications.jobRecommendations
+          : DEFAULT_USER_SETTINGS.notifications.jobRecommendations,
+      weeklyDigest:
+        typeof source?.notifications?.weeklyDigest === "boolean"
+          ? source.notifications.weeklyDigest
+          : DEFAULT_USER_SETTINGS.notifications.weeklyDigest,
+      marketingEmails:
+        typeof source?.notifications?.marketingEmails === "boolean"
+          ? source.notifications.marketingEmails
+          : DEFAULT_USER_SETTINGS.notifications.marketingEmails,
+    },
+    privacy: {
+      profileVisibility: normalizedVisibility,
+      showEmailToRecruiters:
+        typeof source?.privacy?.showEmailToRecruiters === "boolean"
+          ? source.privacy.showEmailToRecruiters
+          : DEFAULT_USER_SETTINGS.privacy.showEmailToRecruiters,
+      showPhoneToRecruiters:
+        typeof source?.privacy?.showPhoneToRecruiters === "boolean"
+          ? source.privacy.showPhoneToRecruiters
+          : DEFAULT_USER_SETTINGS.privacy.showPhoneToRecruiters,
+      allowRecruiterMessages:
+        typeof source?.privacy?.allowRecruiterMessages === "boolean"
+          ? source.privacy.allowRecruiterMessages
+          : DEFAULT_USER_SETTINGS.privacy.allowRecruiterMessages,
+    },
+    preferences: {
+      theme: normalizedTheme,
+      compactMode:
+        typeof source?.preferences?.compactMode === "boolean"
+          ? source.preferences.compactMode
+          : DEFAULT_USER_SETTINGS.preferences.compactMode,
+      autoPlayVideos:
+        typeof source?.preferences?.autoPlayVideos === "boolean"
+          ? source.preferences.autoPlayVideos
+          : DEFAULT_USER_SETTINGS.preferences.autoPlayVideos,
+      language: String(source?.preferences?.language || DEFAULT_USER_SETTINGS.preferences.language)
+        .trim()
+        .slice(0, 24),
+      timezone: String(source?.preferences?.timezone || DEFAULT_USER_SETTINGS.preferences.timezone)
+        .trim()
+        .slice(0, 64),
+    },
+    jobPreferences: {
+      preferredRoles: cleanArrayOfStrings(source?.jobPreferences?.preferredRoles, 15),
+      preferredLocations: cleanArrayOfStrings(source?.jobPreferences?.preferredLocations, 15),
+      openToRemote:
+        typeof source?.jobPreferences?.openToRemote === "boolean"
+          ? source.jobPreferences.openToRemote
+          : DEFAULT_USER_SETTINGS.jobPreferences.openToRemote,
+      minSalaryLPA: Number.isFinite(Number(source?.jobPreferences?.minSalaryLPA))
+        ? Math.max(0, Number(source.jobPreferences.minSalaryLPA))
+        : DEFAULT_USER_SETTINGS.jobPreferences.minSalaryLPA,
+    },
+    recruiterPreferences: {
+      focusHiringFor: cleanArrayOfStrings(source?.recruiterPreferences?.focusHiringFor, 15),
+      preferredWorkRegions: cleanArrayOfStrings(
+        source?.recruiterPreferences?.preferredWorkRegions,
+        15
+      ),
+      autoArchiveRejected:
+        typeof source?.recruiterPreferences?.autoArchiveRejected === "boolean"
+          ? source.recruiterPreferences.autoArchiveRejected
+          : DEFAULT_USER_SETTINGS.recruiterPreferences.autoArchiveRejected,
+      candidateResponseSLAHours: Number.isFinite(
+        Number(source?.recruiterPreferences?.candidateResponseSLAHours)
+      )
+        ? Math.min(168, Math.max(1, Number(source.recruiterPreferences.candidateResponseSLAHours)))
+        : DEFAULT_USER_SETTINGS.recruiterPreferences.candidateResponseSLAHours,
+    },
+    adminPreferences: {
+      strictModerationMode:
+        typeof source?.adminPreferences?.strictModerationMode === "boolean"
+          ? source.adminPreferences.strictModerationMode
+          : DEFAULT_USER_SETTINGS.adminPreferences.strictModerationMode,
+      autoHideReportedPosts:
+        typeof source?.adminPreferences?.autoHideReportedPosts === "boolean"
+          ? source.adminPreferences.autoHideReportedPosts
+          : DEFAULT_USER_SETTINGS.adminPreferences.autoHideReportedPosts,
+      verificationAlerts:
+        typeof source?.adminPreferences?.verificationAlerts === "boolean"
+          ? source.adminPreferences.verificationAlerts
+          : DEFAULT_USER_SETTINGS.adminPreferences.verificationAlerts,
+      ownerDigestFrequency: normalizedDigestFrequency,
+    },
+  };
+};
+
+const getAllowedSettingSections = (role) => {
+  const normalizedRole = String(role || "").trim().toLowerCase();
+  if (normalizedRole === "student") {
+    return ["notifications", "privacy", "preferences", "jobPreferences"];
+  }
+  if (normalizedRole === "recruiter") {
+    return ["notifications", "privacy", "preferences", "recruiterPreferences"];
+  }
+  if (normalizedRole === "admin") {
+    return ["notifications", "preferences", "adminPreferences"];
+  }
+  return ["notifications", "privacy", "preferences"];
+};
+
+const getScopedUserSettings = (role, rawSettings) => {
+  const normalized = normalizeUserSettings(rawSettings);
+  const allowedSections = getAllowedSettingSections(role);
+  return allowedSections.reduce((acc, section) => {
+    acc[section] = normalized[section];
+    return acc;
+  }, {});
+};
+
+const buildSanitizedUser = (user) => ({
+  _id: user._id,
+  fullname: user.fullname,
+  email: user.email,
+  phoneNumber: user.phoneNumber,
+  adharcard: user.adharcard,
+  pancard: user.pancard,
+  role: user.role,
+  profile: user.profile,
+  settings: getScopedUserSettings(user.role, user.settings),
+});
+
 export const getCurrentUser = async (req, res) => {
   try {
     const user = await User.findById(req.id);
@@ -1347,16 +1538,7 @@ export const getCurrentUser = async (req, res) => {
       });
     }
 
-    const sanitizedUser = {
-      _id: user._id,
-      fullname: user.fullname,
-      email: user.email,
-      phoneNumber: user.phoneNumber,
-      adharcard: user.adharcard,
-      pancard: user.pancard,
-      role: user.role,
-      profile: user.profile,
-    };
+    const sanitizedUser = buildSanitizedUser(user);
 
     return res.status(200).json({
       user: sanitizedUser,
@@ -1482,14 +1664,7 @@ export const updateProfile = async (req, res) => {
 
     await user.save();
 
-    const updatedUser = {
-      _id: user._id,
-      fullname: user.fullname,
-      email: user.email,
-      phoneNumber: user.phoneNumber,
-      role: user.role,
-      profile: user.profile,
-    };
+    const updatedUser = buildSanitizedUser(user);
 
     return res.status(200).json({
       message: "Profile updated successfully",
@@ -1502,6 +1677,92 @@ export const updateProfile = async (req, res) => {
       message: "Server Error updating profile",
       success: false,
     });
+  }
+};
+
+export const getUserSettings = async (req, res) => {
+  try {
+    const user = await User.findById(req.id).select("settings role");
+    if (!user) {
+      return res.status(404).json({ message: "User not found", success: false });
+    }
+
+    return res.status(200).json({
+      settings: getScopedUserSettings(user.role, user.settings),
+      success: true,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server Error getting settings", success: false });
+  }
+};
+
+export const updateUserSettings = async (req, res) => {
+  try {
+    const { settings, resetToDefaults } = req.body || {};
+    const user = await User.findById(req.id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found", success: false });
+    }
+
+    if (resetToDefaults) {
+      user.settings = DEFAULT_USER_SETTINGS;
+    } else {
+      const current = normalizeUserSettings(user.settings);
+      const incoming = normalizeUserSettings(settings || {});
+      const allowedSections = new Set(getAllowedSettingSections(user.role));
+
+      user.settings = {
+        notifications: {
+          ...current.notifications,
+          ...(allowedSections.has("notifications") && settings?.notifications
+            ? incoming.notifications
+            : {}),
+        },
+        privacy: {
+          ...current.privacy,
+          ...(allowedSections.has("privacy") && settings?.privacy ? incoming.privacy : {}),
+        },
+        preferences: {
+          ...current.preferences,
+          ...(allowedSections.has("preferences") && settings?.preferences
+            ? incoming.preferences
+            : {}),
+        },
+        jobPreferences: {
+          ...current.jobPreferences,
+          ...(allowedSections.has("jobPreferences") && settings?.jobPreferences
+            ? incoming.jobPreferences
+            : {}),
+        },
+        recruiterPreferences: {
+          ...current.recruiterPreferences,
+          ...(allowedSections.has("recruiterPreferences") && settings?.recruiterPreferences
+            ? incoming.recruiterPreferences
+            : {}),
+        },
+        adminPreferences: {
+          ...current.adminPreferences,
+          ...(allowedSections.has("adminPreferences") && settings?.adminPreferences
+            ? incoming.adminPreferences
+            : {}),
+        },
+      };
+    }
+
+    user.markModified("settings");
+    await user.save();
+
+    return res.status(200).json({
+      message: resetToDefaults ? "Settings reset to defaults" : "Settings updated",
+      settings: getScopedUserSettings(user.role, user.settings),
+      user: buildSanitizedUser(user),
+      success: true,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server Error updating settings", success: false });
   }
 };
 

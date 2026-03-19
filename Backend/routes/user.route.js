@@ -6,6 +6,7 @@ import {
   evaluateMockInterviewAnswers,
   generateMockInterviewSet,
   generatePreparationQuestions,
+  getUserSettings,
   getCurrentUser,
   googleAuth,
   login,
@@ -14,6 +15,7 @@ import {
   register,
   sendEmailOtp,
   sendPhoneOtp,
+  updateUserSettings,
   updateProfile,
   verifyEmailOtp,
   verifyPhoneOtp,
@@ -32,6 +34,7 @@ router.route("/login").post(login);
 router.route("/google").post(googleAuth);
 router.route("/logout").post(logout);
 router.route("/me").get(authenticateToken, getCurrentUser);
+router.route("/settings").get(authenticateToken, getUserSettings).put(authenticateToken, updateUserSettings);
 router.route("/resume/download").get(authenticateToken, downloadResume);
 router.route("/resume/:userId/download").get(authenticateToken, downloadResumeByUserId);
 router.route("/resume/:userId/preview").get(authenticateToken, previewResumeByUserId);

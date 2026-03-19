@@ -14,6 +14,7 @@ import { useSelector } from "react-redux";
 import { useDispatch } from "react-redux";
 import { toast } from "sonner";
 import axios from "axios";
+import { Link } from "react-router-dom";
 import { APPLICATION_API_ENDPOINT } from "@/utils/data";
 import { USER_API_ENDPOINT } from "@/utils/data";
 import { setAllApplicants } from "@/redux/applicationSlice";
@@ -77,13 +78,14 @@ const ApplicantsTable = () => {
             <TableHead>Resume</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Connect</TableHead>
             <TableHead className="text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {!applicants?.applications?.length ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-slate-500 py-4">
+              <TableCell colSpan={8} className="text-center text-slate-500 py-4">
                 No applicants yet for this job.
               </TableCell>
             </TableRow>
@@ -133,6 +135,18 @@ const ApplicantsTable = () => {
                   >
                     {item?.status || "pending"}
                   </span>
+                </TableCell>
+                <TableCell>
+                  {item?.status === "accepted" ? (
+                    <Link
+                      to={`/messages?applicationId=${item?._id}`}
+                      className="inline-flex rounded-md bg-teal-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-teal-500"
+                    >
+                      Message
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-slate-400">Locked</span>
+                  )}
                 </TableCell>
                 <TableCell className="text-right cursor-pointer">
                   <Popover>

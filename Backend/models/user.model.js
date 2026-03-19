@@ -89,6 +89,59 @@ const userSchema = new mongoose.Schema(
         },
       ],
     },
+    settings: {
+      notifications: {
+        applicationUpdates: { type: Boolean, default: true },
+        messageAlerts: { type: Boolean, default: true },
+        announcementAlerts: { type: Boolean, default: true },
+        jobRecommendations: { type: Boolean, default: true },
+        weeklyDigest: { type: Boolean, default: true },
+        marketingEmails: { type: Boolean, default: false },
+      },
+      privacy: {
+        profileVisibility: {
+          type: String,
+          enum: ["public", "recruiters", "private"],
+          default: "recruiters",
+        },
+        showEmailToRecruiters: { type: Boolean, default: false },
+        showPhoneToRecruiters: { type: Boolean, default: false },
+        allowRecruiterMessages: { type: Boolean, default: true },
+      },
+      preferences: {
+        theme: {
+          type: String,
+          enum: ["light", "dark", "system"],
+          default: "system",
+        },
+        compactMode: { type: Boolean, default: false },
+        autoPlayVideos: { type: Boolean, default: true },
+        language: { type: String, default: "en" },
+        timezone: { type: String, default: "Asia/Kolkata" },
+      },
+      jobPreferences: {
+        preferredRoles: [{ type: String }],
+        preferredLocations: [{ type: String }],
+        openToRemote: { type: Boolean, default: true },
+        minSalaryLPA: { type: Number, default: 0 },
+      },
+      recruiterPreferences: {
+        focusHiringFor: [{ type: String }],
+        preferredWorkRegions: [{ type: String }],
+        autoArchiveRejected: { type: Boolean, default: true },
+        candidateResponseSLAHours: { type: Number, default: 48 },
+      },
+      adminPreferences: {
+        strictModerationMode: { type: Boolean, default: true },
+        autoHideReportedPosts: { type: Boolean, default: true },
+        verificationAlerts: { type: Boolean, default: true },
+        ownerDigestFrequency: {
+          type: String,
+          enum: ["daily", "weekly", "off"],
+          default: "weekly",
+        },
+      },
+    },
   },
   { timestamps: true }
 );

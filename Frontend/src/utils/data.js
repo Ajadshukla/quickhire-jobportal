@@ -7,3 +7,5 @@ export const COMPANY_API_ENDPOINT = `${API_BASE_URL}/api/company`;
 export const OWNER_API_ENDPOINT = `${API_BASE_URL}/api/owner`;
 export const ANNOUNCEMENT_API_ENDPOINT = `${API_BASE_URL}/api/announcement`;
 export const POSTS_API_ENDPOINT = `${API_BASE_URL}/api/posts`;
+export const MESSAGES_API_ENDPOINT = `${API_BASE_URL}/api/messages`;
+export const REALTIME_API_URL = API_BASE_URL;

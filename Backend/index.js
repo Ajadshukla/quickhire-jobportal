@@ -2,6 +2,8 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
+import { createServer } from "node:http";
+import { Server as SocketIOServer } from "socket.io";
 import connectDB from "./utils/db.js";
 import userRoute from "./routes/user.route.js";
 import companyRoute from "./routes/company.route.js";
@@ -10,6 +12,8 @@ import applicationRoute from "./routes/application.route.js";
 import ownerRoute from "./routes/owner.route.js";
 import announcementRoute from "./routes/announcement.route.js";
 import postRoute from "./routes/post.route.js";
+import messageRoute from "./routes/message.route.js";
+import { registerRealtimeHandlers } from "./utils/realtime.js";
 
 dotenv.config({});
 const app = express();
@@ -72,8 +76,17 @@ app.use("/api/application", applicationRoute);
 app.use("/api/owner", ownerRoute);
 app.use("/api/announcement", announcementRoute);
 app.use("/api/posts", postRoute);
+app.use("/api/messages", messageRoute);
 
-const server = app.listen(PORT, () => {
+const server = createServer(app);
+const io = new SocketIOServer(server, {
+  cors: corsOptions,
+});
+
+registerRealtimeHandlers(io);
+app.set("io", io);
+
+server.listen(PORT, () => {
   connectDB();
   console.log(`Server is running on port ${PORT}`);
 });

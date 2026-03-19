@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
-import { LogOut, Menu, Moon, Sun, User2, X } from "lucide-react";
+import { ChevronDown, LogOut, Menu, Moon, Settings, Sun, User2, X } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "sonner";
 import axios from "axios"; // Import axios
@@ -61,12 +61,14 @@ const Navbar = () => {
       : user && user.role === "Recruiter"
       ? [
           { label: "Feed", to: "/feed" },
+          { label: "Messages", to: "/messages" },
           { label: "Companies", to: "/admin/companies" },
           { label: "Jobs", to: "/admin/jobs" },
         ]
       : [
           { label: "Home", to: "/Home" },
           { label: "Feed", to: "/feed" },
+          ...(user && user.role === "Student" ? [{ label: "Messages", to: "/messages" }] : []),
           { label: "Browse", to: "/Browse" },
           { label: "Jobs", to: "/Jobs" },
           ...(user && user.role === "Student"
@@ -77,6 +79,14 @@ const Navbar = () => {
               ]
             : []),
         ];
+
+  const isStudentUser = Boolean(user && user.role === "Student");
+  const desktopPrimaryNavItems = isStudentUser
+    ? navItems.filter((item) => ["/Home", "/feed", "/messages", "/Jobs"].includes(item.to))
+    : navItems;
+  const desktopMoreNavItems = isStudentUser
+    ? navItems.filter((item) => !["/Home", "/feed", "/messages", "/Jobs"].includes(item.to))
+    : [];
 
   const logoutHandler = async () => {
     try {
@@ -119,13 +129,38 @@ const Navbar = () => {
           </div>
           <div className="flex items-center gap-2 md:gap-6">
             <ul className="hidden md:flex font-semibold items-center gap-5 text-slate-700 dark:text-slate-300 tracking-wide">
-              {navItems.map((item) => (
+              {desktopPrimaryNavItems.map((item) => (
                 <li key={item.to}>
                   <Link className="hover:text-slate-900 dark:hover:text-white transition-colors" to={item.to}>
                     {item.label}
                   </Link>
                 </li>
               ))}
+
+              {desktopMoreNavItems.length > 0 ? (
+                <li>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="inline-flex items-center gap-1 rounded-md px-1 py-1 hover:text-slate-900 dark:hover:text-white transition-colors">
+                        More <ChevronDown className="h-4 w-4" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-52 p-2">
+                      <div className="space-y-1">
+                        {desktopMoreNavItems.map((item) => (
+                          <Link
+                            key={item.to}
+                            to={item.to}
+                            className="block rounded-md px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                          >
+                            {item.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </li>
+              ) : null}
             </ul>
 
             <Button
@@ -190,6 +225,13 @@ const Navbar = () => {
                         </Button>
                       </div>
                     )}
+
+                    <div className="flex w-fit items-center gap-2 cursor-pointer">
+                      <Settings />
+                      <Button variant="link">
+                        <Link to={"/settings"}>Settings</Link>
+                      </Button>
+                    </div>
 
                     <div className="flex w-fit items-center gap-2 cursor-pointer">
                       <LogOut></LogOut>
@@ -261,6 +303,12 @@ const Navbar = () => {
                       </Button>
                     </Link>
                   )}
+
+                  <Link to={"/settings"} onClick={closeMobileMenu}>
+                    <Button variant="outline" className="w-full justify-start border-slate-300 dark:border-slate-700">
+                      <Settings className="h-4 w-4 mr-2" /> Settings
+                    </Button>
+                  </Link>
 
                   <Button
                     onClick={async () => {

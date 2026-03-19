@@ -12,7 +12,10 @@ import ResumeAnalyzer from "./components/components_lite/ResumeAnalyzer.jsx";
 import Preparation from "./components/components_lite/Preparation.jsx";
 import StudentAnnouncements from "./components/components_lite/StudentAnnouncements.jsx";
 import Feed from "./components/components_lite/Feed.jsx";
+import Messages from "./components/components_lite/Messages.jsx";
+import Settings from "./components/components_lite/Settings.jsx";
 import Description from "./components/components_lite/Description.jsx";
+import QuickInboxDock from "./components/components_lite/QuickInboxDock.jsx";
 import Companies from "./components/admincomponent/Companies";
 import CompanyCreate from "./components/admincomponent/CompanyCreate";
 import CompanySetup from "./components/admincomponent/CompanySetup";
@@ -45,7 +48,7 @@ const appRouter = createBrowserRouter([
   {
     path: "/Profile",
     element: (
-      <AuthProtectedRoute>
+      <AuthProtectedRoute requiredRole="Student">
         <Profile />
       </AuthProtectedRoute>
     ),
@@ -77,6 +80,22 @@ const appRouter = createBrowserRouter([
   {
     path: "/feed",
     element: <Feed />,
+  },
+  {
+    path: "/messages",
+    element: (
+      <AuthProtectedRoute>
+        <Messages />
+      </AuthProtectedRoute>
+    ),
+  },
+  {
+    path: "/settings",
+    element: (
+      <AuthProtectedRoute>
+        <Settings />
+      </AuthProtectedRoute>
+    ),
   },
   {
     path: "/PrivacyPolicy",
@@ -199,6 +218,7 @@ function App() {
   return (
     <div>
       <RouterProvider router={appRouter}></RouterProvider>
+      <QuickInboxDock />
     </div>
   );
 }
