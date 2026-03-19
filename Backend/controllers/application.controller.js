@@ -115,11 +115,7 @@ export const getApplicants = async (req, res) => {
       return res.status(404).json({ message: "User not found", success: false });
     }
 
-    const job = await Job.findById(jobId).populate({
-      path: "applications",
-      options: { sort: { createdAt: -1 } },
-      populate: { path: "applicant", options: { sort: { createdAt: -1 } } },
-    });
+    const job = await Job.findById(jobId).select("created_by title company applications");
     if (!job) {
       return res.status(404).json({ message: "Job not found", success: false });
     }
@@ -129,22 +125,35 @@ export const getApplicants = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to view applicants", success: false });
     }
 
-    const orphaned = (job.applications || [])
+    // Query applications directly so applicants still appear even if job.applications got stale.
+    const applications = await Application.find({ job: jobId })
+      .sort({ createdAt: -1 })
+      .populate({ path: "applicant", options: { sort: { createdAt: -1 } } });
+
+    const orphaned = (applications || [])
       .filter((item) => !item?.applicant)
       .map((item) => item?._id);
 
     if (orphaned.length > 0) {
       await cleanupOrphanApplications(orphaned);
-      const refreshedJob = await Job.findById(jobId).populate({
-        path: "applications",
-        options: { sort: { createdAt: -1 } },
-        populate: { path: "applicant", options: { sort: { createdAt: -1 } } },
-      });
-
-      return res.status(200).json({ job: refreshedJob, success: true });
     }
 
-    return res.status(200).json({ job, success: true });
+    const validApplications = (applications || []).filter((item) => Boolean(item?.applicant));
+
+    const missingRefs = validApplications
+      .map((item) => String(item?._id || ""))
+      .filter((id) => id && !(job.applications || []).some((existingId) => String(existingId) === id));
+
+    if (missingRefs.length > 0) {
+      await Job.findByIdAndUpdate(jobId, { $addToSet: { applications: { $each: missingRefs } } });
+    }
+
+    const jobResponse = {
+      ...job.toObject(),
+      applications: validApplications,
+    };
+
+    return res.status(200).json({ job: jobResponse, success: true });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error", success: false });
