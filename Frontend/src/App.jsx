@@ -11,6 +11,7 @@ import Profile from "./components/components_lite/Profile.jsx";
 import ResumeAnalyzer from "./components/components_lite/ResumeAnalyzer.jsx";
 import Preparation from "./components/components_lite/Preparation.jsx";
 import StudentAnnouncements from "./components/components_lite/StudentAnnouncements.jsx";
+import Feed from "./components/components_lite/Feed.jsx";
 import Description from "./components/components_lite/Description.jsx";
 import Companies from "./components/admincomponent/Companies";
 import CompanyCreate from "./components/admincomponent/CompanyCreate";
@@ -72,6 +73,10 @@ const appRouter = createBrowserRouter([
         <StudentAnnouncements />
       </AuthProtectedRoute>
     ),
+  },
+  {
+    path: "/feed",
+    element: <Feed />,
   },
   {
     path: "/PrivacyPolicy",

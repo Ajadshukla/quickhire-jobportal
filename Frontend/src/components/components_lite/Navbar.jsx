@@ -54,16 +54,19 @@ const Navbar = () => {
   const navItems =
     user && user.role === "Admin"
       ? [
+          { label: "Feed", to: "/feed" },
           { label: "Owner", to: "/owner/dashboard" },
           { label: "Announcements", to: "/owner/announcements" },
         ]
       : user && user.role === "Recruiter"
       ? [
+          { label: "Feed", to: "/feed" },
           { label: "Companies", to: "/admin/companies" },
           { label: "Jobs", to: "/admin/jobs" },
         ]
       : [
           { label: "Home", to: "/Home" },
+          { label: "Feed", to: "/feed" },
           { label: "Browse", to: "/Browse" },
           { label: "Jobs", to: "/Jobs" },
           ...(user && user.role === "Student"

@@ -34,6 +34,13 @@ const userSchema = new mongoose.Schema(
       enum: ["Student", "Recruiter", "Admin"],
       default: "Student",
       required: true,
+      set: (value) => {
+        const normalized = String(value || "").trim().toLowerCase();
+        if (normalized === "student") return "Student";
+        if (normalized === "recruiter") return "Recruiter";
+        if (normalized === "admin") return "Admin";
+        return value;
+      },
     },
     isBlocked: {
       type: Boolean,
